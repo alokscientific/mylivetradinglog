@@ -286,7 +286,12 @@ def draw_card(row):
         with c1:
             st.metric(label="LIVE PRICE", value=f"₹{live_p}", delta=change_str)
         with c2:
-            pnl_html = get_pnl_html(row.get('Live P&L %', 0))
+            # P&L Logic Fix for WAITING Status
+            if status == "WAITING":
+                pnl_html = '<span class="pnl-value" style="opacity: 0.5;">--</span>'
+            else:
+                pnl_html = get_pnl_html(row.get('Live P&L %', 0))
+                
             st.markdown(f"""
             <div class="pnl-container">
                 <div class="st-emotion-cache-1qmj432" style="font-size: 0.75rem; font-weight: 600; opacity: 0.7; text-transform: uppercase;">LIVE P&L</div>
