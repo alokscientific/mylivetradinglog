@@ -1,9 +1,9 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="LBA ALGO Track System", page_icon="📈", layout="wide")
+st.set_page_config(page_title="TRADE LOG", page_icon="📈", layout="wide")
 
-st.title("LBA ALGO Track System")
+st.title("TRADE LOG")
 st.write("**Automated Execution & Faceless Trading Dashboard**")
 
 st.info("Disclaimer: EDUCATIONAL PURPOSES ONLY. I am NOT a SEBI Registered Analyst. This dashboard strictly tracks personal algorithmic logic. Do not consider this as buy/sell advice.")
