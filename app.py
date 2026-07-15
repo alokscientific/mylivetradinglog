@@ -4,6 +4,7 @@ import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
 import yfinance as yf
+import time
 
 # Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
@@ -366,3 +367,7 @@ if not df.empty:
                     draw_card(row)
 else:
     st.warning("⚠️ Critical: Data feed interrupted or source is empty.")
+
+# Auto-Refresh System
+time.sleep(5)
+st.rerun()
