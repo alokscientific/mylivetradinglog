@@ -26,7 +26,7 @@ html, body, [class*="st-"] {
 .main-title {
     background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
     color: white;
-    padding: 10px 24px; /* Text left gap is 24px */
+    padding: 10px 24px;
     border-radius: 8px;
     font-weight: 900;
     font-size: 1.8rem;
@@ -41,7 +41,7 @@ html, body, [class*="st-"] {
     font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.5px;
-    margin-left: 24px; /* Perfectly aligned with the Title text */
+    margin-left: 24px;
 }
 
 /* Card Design - Adaptive Blue Outline & Hover Effects */
@@ -100,6 +100,17 @@ div[data-testid="stMetricLabel"] {
     font-size: 0.85rem;
 }
 
+/* Dynamic Live P&L Container Styling */
+.pnl-container {
+    display: flex;
+    flex-direction: column;
+}
+.pnl-value {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin-top: 4px;
+}
+
 /* Colors for specific values */
 .text-green { color: #10b981 !important; }
 .text-red { color: #ef4444 !important; }
@@ -139,7 +150,6 @@ st.divider()
 @st.cache_data(ttl=60)
 def get_yahoo_change(symbol):
     try:
-        # Convert Google Finance symbol to Yahoo Finance symbol
         yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
         if "BSE:" in symbol: 
             yf_sym = symbol.replace("BSE:", "") + ".BO"
@@ -192,13 +202,27 @@ def load_data():
 
 df = load_data()
 
-def format_pct(val):
+# Process Live P&L Function with dynamic sign and styling
+def get_pnl_html(val_raw):
     try:
-        if pd.isna(val): return "0.00%"
-        if isinstance(val, str) and '%' in val: return val
-        return f"{float(val)*100:.2f}%"
+        if pd.isna(val_raw): 
+            return '<span class="pnl-value">0.00%</span>'
+        
+        val_str = str(val_raw).replace('%', '').replace(',', '').strip()
+        val = float(val_str)
+        
+        # Check if sheet contains raw decimals (e.g. 0.0182 instead of 1.82)
+        if abs(val) < 1.0 and val != 0:
+            val = val * 100
+            
+        if val > 0:
+            return f'<span class="pnl-value text-green">+{val:.2f}%</span>'
+        elif val < 0:
+            return f'<span class="pnl-value text-red">{val:.2f}%</span>'
+        else:
+            return f'<span class="pnl-value">0.00%</span>'
     except:
-        return "0.00%"
+        return '<span class="pnl-value">0.00%</span>'
 
 def draw_card(row):
     with st.container(border=True):
@@ -237,15 +261,12 @@ def draw_card(row):
         """, unsafe_allow_html=True)
 
         live_p = row.get('Live Price', 0)
-        pnl_val = format_pct(row.get('Live P&L %', 0))
         
         # Real-time Yahoo Finance Delta Integration
         yf_change = get_yahoo_change(raw_symbol)
-        
         if yf_change:
             change_str = yf_change
         else:
-            # Sheet Backup Fallback
             t_change_raw = str(row.get("Today's Change", "0")).strip()
             try:
                 if '%' in t_change_raw:
@@ -257,11 +278,18 @@ def draw_card(row):
             except:
                 change_str = "0.00%"
 
+        # Main Layout: Live Price & Custom Styled Live P&L
         c1, c2 = st.columns(2)
         with c1:
             st.metric(label="LIVE PRICE", value=f"₹{live_p}", delta=change_str)
         with c2:
-            st.metric(label="LIVE P&L", value=pnl_val)
+            pnl_html = get_pnl_html(row.get('Live P&L %', 0))
+            st.markdown(f"""
+            <div class="pnl-container">
+                <div class="st-emotion-cache-1qmj432" style="font-size: 0.75rem; font-weight: 600; opacity: 0.7; text-transform: uppercase;">LIVE P&L</div>
+                {pnl_html}
+            </div>
+            """, unsafe_allow_html=True)
 
         entry_p = row.get('Entry Price', 0)
         tgt = row.get('Target Price', 0)
