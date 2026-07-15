@@ -211,7 +211,7 @@ def get_pnl_html(val_raw):
         val_str = str(val_raw).replace('%', '').replace(',', '').strip()
         val = float(val_str)
         
-        # Check if sheet contains raw decimals (e.g. 0.0182 instead of 1.82)
+        # Check if sheet contains raw decimals
         if abs(val) < 1.0 and val != 0:
             val = val * 100
             
@@ -230,12 +230,15 @@ def draw_card(row):
         clean_symbol = raw_symbol.split(':')[-1] if ':' in raw_symbol else raw_symbol
         company_name = str(row.get('Company Name', '--'))
         
-        status = str(row.get('Status', 'IN TRADE'))
+        status = str(row.get('Status', 'IN TRADE')).strip().upper()
         
+        # BADGE LOGIC
         if status == "TARGET HIT":
             status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.8rem; background: rgba(16,185,129,0.1); padding: 3px 8px; border-radius: 4px;'>■ TARGET HIT</span>"
         elif status == "SL HIT":
             status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.8rem; background: rgba(239,68,68,0.1); padding: 3px 8px; border-radius: 4px;'>■ SL HIT</span>"
+        elif status == "WAITING":
+            status_html = "<span style='color: #f59e0b; font-weight: 800; font-size: 0.8rem; background: rgba(245,158,11,0.1); padding: 3px 8px; border-radius: 4px;'>⏳ PENDING</span>"
         else:
             status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.8rem; background: rgba(59,130,246,0.1); padding: 3px 8px; border-radius: 4px;'>■ ACTIVE</span>"
 
