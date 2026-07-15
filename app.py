@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="TRADE LOG", page_icon="📈", layout="wide")
+# Page layout
+st.set_page_config(page_title="LBA ALGO Track System", page_icon="📈", layout="wide")
 
-st.title("TRADE LOG")
-st.write("**Track & Trade Dashboard**")
+st.title("LBA ALGO Track System")
+st.write("**Automated Execution & Faceless Trading Dashboard**")
 
 st.info("Disclaimer: EDUCATIONAL PURPOSES ONLY. I am NOT a SEBI Registered Analyst. This dashboard strictly tracks personal algorithmic logic. Do not consider this as buy/sell advice.")
 
@@ -34,36 +35,66 @@ def format_pct(val):
         return "0.00%"
 
 def draw_card(row):
+    # Card ko premium look dene ke liye
     with st.container(border=True):
         raw_symbol = str(row['Stock Symbol']).strip()
         clean_symbol = raw_symbol.split(':')[-1] if ':' in raw_symbol else raw_symbol
         company_name = str(row.get('Company Name', '--'))
 
-        st.markdown(f"#### 🏷️ {raw_symbol}")
+        # Header - Thoda chota font use kiya h (Markdown ### ki jagah ####)
+        st.markdown(f"##### 🏷️ {raw_symbol}")
         st.caption(f"{company_name}")
-        st.divider() 
+        
+        # Horizontal Scrolling News Ticker (Marquee)
+        st.markdown(f'''
+        <marquee scrollamount="4" style="color: #6c757d; font-size: 13px; font-weight: bold; padding: 2px; border-bottom: 1px solid #e0e0e0;">
+        🔴 LIVE: Tracking algorithm execution for {clean_symbol}... Watch for technical breakout alerts...
+        </marquee>
+        ''', unsafe_allow_html=True)
 
-        c1, c2, c3 = st.columns(3)
+        st.write("") # Thoda space
+
+        # Metrics Layout: 2 Columns me baant diya taaki compact lage
+        c1, c2 = st.columns(2)
+        
         with c1:
             st.metric(label="Entry Price", value=f"₹{row.get('Entry Price', 0)}")
+            st.metric(label="🎯 Target", value=f"₹{row.get('Target Price', 0)}")
+            
         with c2:
-            st.metric(label="Live Price", value=f"₹{row.get('Live Price', 0)}")
-        with c3:
-            pnl_val = format_pct(row.get('Live P&L %', 0))
-            st.metric(label="Live P&L", value=pnl_val)
+            # Today's Change ko Delta me daalna (Auto Green/Red)
+            try:
+                t_change = float(row.get("Today's Change", 0)) * 100
+                change_str = f"{t_change:+.2f}%"
+            except:
+                change_str = "0.00%"
+                
+            st.metric(label="Live Price", value=f"₹{row.get('Live Price', 0)}", delta=change_str)
+            st.metric(label="🔴 SL Level", value=f"₹{row.get('SL Level', 0)}")
 
+        # Live P&L and Status
+        pnl_val = format_pct(row.get('Live P&L %', 0))
         status = str(row.get('Status', 'IN TRADE'))
-        if status == "TARGET HIT":
-            st.success("🎯 TARGET HIT")
-        elif status == "SL HIT":
-            st.error("🔴 SL HIT")
-        else:
-            st.info("🟡 IN TRADE")
-
+        
         st.divider()
+        
+        # P&L display based on status
+        if status == "TARGET HIT":
+            st.success(f"🎯 WIN! P&L: {pnl_val}")
+        elif status == "SL HIT":
+            st.error(f"🔴 SL HIT! P&L: {pnl_val}")
+        else:
+            st.info(f"🟡 LIVE P&L: {pnl_val}")
+
+        # Real Buttons for Screener and TradingView
         screener_url = f"https://www.screener.in/company/{clean_symbol}/"
         tv_url = f"https://in.tradingview.com/chart/?symbol={raw_symbol}"
-        st.markdown(f"[📊 Screener Data]({screener_url}) &nbsp; | &nbsp; [📈 TradingView Chart]({tv_url})")
+        
+        btn1, btn2 = st.columns(2)
+        with btn1:
+            st.link_button("📊 Screener", screener_url, use_container_width=True)
+        with btn2:
+            st.link_button("📈 Chart", tv_url, use_container_width=True)
 
 if not df.empty:
     tab1, tab2 = st.tabs(["📊 Active Trades", "📜 Closed Trades History"])
@@ -73,9 +104,10 @@ if not df.empty:
         if active_df.empty:
             st.info("Abhi koi active trade nahi hai.")
         else:
-            cols = st.columns(3)
+            # Size chota karne ke liye ab 4 columns banaye hain (Pehle 3 the)
+            cols = st.columns(4)
             for index, row in active_df.iterrows():
-                with cols[index % 3]:
+                with cols[index % 4]:
                     draw_card(row)
 
     with tab2:
@@ -83,10 +115,11 @@ if not df.empty:
         if history_df.empty:
             st.info("Abhi tak koi bhi trade close nahi hui hai.")
         else:
-            cols = st.columns(3)
+            # Size chota karne ke liye yahan bhi 4 columns
+            cols = st.columns(4)
             history_df = history_df.reset_index(drop=True)
             for index, row in history_df.iterrows():
-                with cols[index % 3]:
+                with cols[index % 4]:
                     draw_card(row)
 else:
     st.warning("⚠️ Google Sheet ekdum khali hai ya URL block ho raha hai.")
