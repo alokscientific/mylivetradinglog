@@ -3,6 +3,7 @@ import pandas as pd
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
+import yfinance as yf
 
 # Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
@@ -20,25 +21,27 @@ html, body, [class*="st-"] {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    margin-bottom: 20px;
+    margin-bottom: 25px;
 }
 .main-title {
     background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
     color: white;
-    padding: 10px 24px;
+    padding: 10px 24px; /* Text left gap is 24px */
     border-radius: 8px;
-    font-weight: 800;
+    font-weight: 900;
     font-size: 1.8rem;
     letter-spacing: 1.5px;
     box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+    display: inline-block;
 }
 .sub-title {
     color: var(--text-color);
     opacity: 0.7;
-    font-size: 1rem;
+    font-size: 0.95rem;
     font-weight: 600;
     letter-spacing: 0.5px;
+    margin-left: 24px; /* Perfectly aligned with the Title text */
 }
 
 /* Card Design - Adaptive Blue Outline & Hover Effects */
@@ -46,7 +49,7 @@ div[data-testid="stVerticalBlockBorderWrapper"] {
     border: 1px solid rgba(59, 130, 246, 0.3) !important;
     border-top: 4px solid #2563eb !important;
     border-radius: 10px !important;
-    background-color: transparent !important; /* Adaptive background */
+    background-color: transparent !important;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
     padding: 1rem !important;
     transition: all 0.3s ease;
@@ -57,10 +60,10 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     transform: translateY(-2px);
 }
 
-/* Metric text color fix for dark mode */
+/* Metric text adjustments */
 div[data-testid="stMetricValue"] {
-    font-size: 1.2rem !important; 
-    font-weight: 700 !important;
+    font-size: 1.25rem !important; 
+    font-weight: 800 !important;
 }
 div[data-testid="stMetricLabel"] {
     font-size: 0.75rem !important;
@@ -69,13 +72,13 @@ div[data-testid="stMetricLabel"] {
     text-transform: uppercase;
 }
 
-/* Data Grid Layout (Semi-transparent for both themes) */
+/* Data Grid Layout */
 .data-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
     gap: 8px;
     background-color: rgba(148, 163, 184, 0.05);
-    padding: 10px;
+    padding: 12px;
     border-radius: 6px;
     border: 1px solid rgba(148, 163, 184, 0.2);
     margin: 12px 0;
@@ -97,10 +100,9 @@ div[data-testid="stMetricLabel"] {
     font-size: 0.85rem;
 }
 
-/* Universal Red/Green text that looks good on dark and light */
+/* Colors for specific values */
 .text-green { color: #10b981 !important; }
 .text-red { color: #ef4444 !important; }
-.text-blue { color: #3b82f6 !important; }
 
 /* News Section */
 .news-section {
@@ -124,7 +126,7 @@ div[data-testid="stMetricLabel"] {
 </style>
 """, unsafe_allow_html=True)
 
-# Properly Aligned Header
+# Properly Aligned Header Module
 st.markdown("""
 <div class="header-container">
     <div class="main-title">TRADE LOG SYSTEM</div>
@@ -133,11 +135,31 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.divider()
 
-# Live News Fetching Function (Uses Google News RSS)
-@st.cache_data(ttl=1800) # Caches news for 30 mins to avoid slowdowns
+# Live Real-Time Change from Yahoo Finance
+@st.cache_data(ttl=60)
+def get_yahoo_change(symbol):
+    try:
+        # Convert Google Finance symbol to Yahoo Finance symbol
+        yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
+        if "BSE:" in symbol: 
+            yf_sym = symbol.replace("BSE:", "") + ".BO"
+            
+        tkr = yf.Ticker(yf_sym)
+        prev = tkr.fast_info['previous_close']
+        curr = tkr.fast_info['last_price']
+        
+        if prev and prev > 0:
+            pct = ((curr - prev) / prev) * 100
+            return f"{pct:+.2f}%"
+    except:
+        pass
+    return None
+
+# Live News Fetching Function
+@st.cache_data(ttl=1800)
 def get_live_news(company_name):
     try:
-        clean_name = company_name.split()[0] # Take first word to improve search
+        clean_name = company_name.split()[0]
         query = urllib.parse.quote(f"{clean_name} stock news India")
         url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
         
@@ -145,13 +167,12 @@ def get_live_news(company_name):
         response = urllib.request.urlopen(req, timeout=3)
         root = ET.fromstring(response.read())
         
-        # Get top 2 headlines
         headlines = [item.find('title').text for item in root.findall('.//item')[:2]]
         if headlines:
             return " &nbsp; ✦ &nbsp; ".join(headlines)
     except:
         pass
-    return f"Scanning latest market movements and structural shifts for {company_name}..."
+    return f"Tracking latest technical updates and alerts for {company_name}..."
 
 # Core Data Connection
 SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
@@ -205,11 +226,11 @@ def draw_card(row):
 
         # Header Module
         st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
             <div>
-                <div style="font-weight: 800; font-size: 1.2rem; line-height: 1.2;">{clean_symbol}</div>
-                <div style="font-size: 0.75rem; opacity: 0.7; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{company_name}</div>
-                <div style="font-size: 0.65rem; opacity: 0.5; font-weight: 600; margin-top: 3px;">{date_str}</div>
+                <div style="font-weight: 900; font-size: 1.3rem; line-height: 1.1;">{clean_symbol}</div>
+                <div style="font-size: 0.75rem; opacity: 0.7; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">{company_name}</div>
+                <div style="font-size: 0.65rem; opacity: 0.5; font-weight: 600; margin-top: 4px;">{date_str}</div>
             </div>
             <div>{status_html}</div>
         </div>
@@ -218,20 +239,23 @@ def draw_card(row):
         live_p = row.get('Live Price', 0)
         pnl_val = format_pct(row.get('Live P&L %', 0))
         
-        # Change % Fix
-        t_change_raw = str(row.get("Today's Change", "0")).strip()
-        try:
-            if '%' in t_change_raw:
-                val = float(t_change_raw.replace('%', '').replace(',', ''))
-                change_str = f"{val:+.2f}%"
-            else:
-                val = float(t_change_raw.replace(',', ''))
-                if abs(val) < 1.0 and val != 0: 
-                    change_str = f"{val * 100:+.2f}%"
-                else:
+        # Real-time Yahoo Finance Delta Integration
+        yf_change = get_yahoo_change(raw_symbol)
+        
+        if yf_change:
+            change_str = yf_change
+        else:
+            # Sheet Backup Fallback
+            t_change_raw = str(row.get("Today's Change", "0")).strip()
+            try:
+                if '%' in t_change_raw:
+                    val = float(t_change_raw.replace('%', '').replace(',', ''))
                     change_str = f"{val:+.2f}%"
-        except:
-            change_str = "0.00%"
+                else:
+                    val = float(t_change_raw.replace(',', ''))
+                    change_str = f"{val * 100:+.2f}%" if abs(val) < 1.0 and val != 0 else f"{val:+.2f}%"
+            except:
+                change_str = "0.00%"
 
         c1, c2 = st.columns(2)
         with c1:
