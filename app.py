@@ -203,9 +203,6 @@ def load_data():
 
 df = load_data()
 
-# ==========================================
-# FIX APPLIED HERE: Accurate P&L Calculation
-# ==========================================
 def get_pnl_html(val_raw):
     try:
         if pd.isna(val_raw): 
@@ -213,14 +210,10 @@ def get_pnl_html(val_raw):
         
         val_str = str(val_raw).strip()
         
-        # Agar Google Sheet khud hi '%' me export kar rahi hai (e.g. "0.43%")
         if '%' in val_str:
             val = float(val_str.replace('%', '').replace(',', ''))
-            # Yahan multiply by 100 nahi hoga
         else:
-            # Agar raw value hai
             val = float(val_str.replace(',', ''))
-            # Sirf tabhi multiply by 100 karo agar sheet ne decimals me bheja hai
             if abs(val) < 1.0 and val != 0:
                 val = val * 100
                 
@@ -274,7 +267,6 @@ def draw_card(row):
 
         live_p = row.get('Live Price', 0)
         
-        # Real-time Yahoo Finance Delta Integration
         yf_change = get_yahoo_change(raw_symbol)
         if yf_change:
             change_str = yf_change
@@ -290,12 +282,10 @@ def draw_card(row):
             except:
                 change_str = "0.00%"
 
-        # Main Layout: Live Price & Custom Styled Live P&L
         c1, c2 = st.columns(2)
         with c1:
             st.metric(label="LIVE PRICE", value=f"₹{live_p}", delta=change_str)
         with c2:
-            # P&L Logic Fix for WAITING Status
             if status == "WAITING":
                 pnl_html = '<span class="pnl-value" style="opacity: 0.5;">--</span>'
             else:
@@ -312,7 +302,6 @@ def draw_card(row):
         tgt = row.get('Target Price', 0)
         sl = row.get('SL Level', 0)
         
-        # Grid Data Module
         st.markdown(f"""
         <div class="data-grid">
             <div class="data-item">
@@ -330,7 +319,6 @@ def draw_card(row):
         </div>
         """, unsafe_allow_html=True)
         
-        # Dynamic News Ticker
         latest_news = get_live_news(company_name)
         st.markdown(f"""
         <div class="news-section">
@@ -343,7 +331,6 @@ def draw_card(row):
         </div>
         """, unsafe_allow_html=True)
         
-        # Action Buttons
         btn1, btn2 = st.columns(2)
         with btn1:
             st.link_button("DATA", f"https://www.screener.in/company/{clean_symbol}/", use_container_width=True)
@@ -354,12 +341,13 @@ if not df.empty:
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
     with tab1:
-        # PENDING trades are hidden, only ACTIVE ("IN TRADE") show up
         active_df = df[df['Status'].isin(["IN TRADE"])]
         if active_df.empty:
             st.info("System currently idle. No active tracking.")
         else:
             cols = st.columns(4)
+            # FIX APPLIED HERE: Reset index so it doesn't skip grid spaces for hidden WAITING rows
+            active_df = active_df.reset_index(drop=True)
             for index, row in active_df.iterrows():
                 with cols[index % 4]:
                     draw_card(row)
@@ -377,6 +365,5 @@ if not df.empty:
 else:
     st.warning("⚠️ Critical: Data feed interrupted or source is empty.")
 
-# --- Auto-Refresh System ---
 time.sleep(5)
 st.rerun()
