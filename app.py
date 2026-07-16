@@ -190,7 +190,7 @@ SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
 GID = "1424037063"
 SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
 
-@st.cache_data(ttl=30)
+@st.cache_data(ttl=5)
 def load_data():
     try:
         data = pd.read_csv(SHEET_CSV_URL)
@@ -203,19 +203,27 @@ def load_data():
 
 df = load_data()
 
-# Process Live P&L Function with dynamic sign and styling
+# ==========================================
+# FIX APPLIED HERE: Accurate P&L Calculation
+# ==========================================
 def get_pnl_html(val_raw):
     try:
         if pd.isna(val_raw): 
             return '<span class="pnl-value">0.00%</span>'
         
-        val_str = str(val_raw).replace('%', '').replace(',', '').strip()
-        val = float(val_str)
+        val_str = str(val_raw).strip()
         
-        # Check if sheet contains raw decimals
-        if abs(val) < 1.0 and val != 0:
-            val = val * 100
-            
+        # Agar Google Sheet khud hi '%' me export kar rahi hai (e.g. "0.43%")
+        if '%' in val_str:
+            val = float(val_str.replace('%', '').replace(',', ''))
+            # Yahan multiply by 100 nahi hoga
+        else:
+            # Agar raw value hai
+            val = float(val_str.replace(',', ''))
+            # Sirf tabhi multiply by 100 karo agar sheet ne decimals me bheja hai
+            if abs(val) < 1.0 and val != 0:
+                val = val * 100
+                
         if val > 0:
             return f'<span class="pnl-value text-green">+{val:.2f}%</span>'
         elif val < 0:
@@ -346,7 +354,8 @@ if not df.empty:
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
     with tab1:
-        active_df = df[df['Status'].isin(["IN TRADE", "WAITING"])]
+        # PENDING trades are hidden, only ACTIVE ("IN TRADE") show up
+        active_df = df[df['Status'].isin(["IN TRADE"])]
         if active_df.empty:
             st.info("System currently idle. No active tracking.")
         else:
@@ -368,6 +377,6 @@ if not df.empty:
 else:
     st.warning("⚠️ Critical: Data feed interrupted or source is empty.")
 
-# Auto-Refresh System
+# --- Auto-Refresh System ---
 time.sleep(5)
 st.rerun()
