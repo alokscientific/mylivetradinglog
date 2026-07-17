@@ -357,22 +357,41 @@ if not df.empty:
         if history_df.empty:
             st.info("No closed logs found in the database.")
         else:
-            # Table format setup for history
+            # Note: Humne 'Live P&L %' ko list se hata diya hai taaki hum khud locked P&L banayein
             display_columns = [
                 'Stock Symbol', 'Company Name', 'Entry Date', 
                 'Entry Price', 'Target Price', 'SL Level', 
-                'Hit Date', 'Live P&L %', 'Status'
+                'Hit Date', 'Status'
             ]
             
-            # Keep only columns that actually exist in the sheet to prevent errors
             existing_cols = [col for col in display_columns if col in history_df.columns]
-            
-            # Ek nayi copy banayenge taaki original data disturb na ho
             display_df = history_df[existing_cols].copy()
             
-            # 🔥 YAHAN MAIN FIX HAI: Column ka naam rename kar diya viewer ke liye
-            if 'Live P&L %' in display_df.columns:
-                display_df.rename(columns={'Live P&L %': 'Final P&L %'}, inplace=True)
+            # 🔥 EXACT LOCKED P&L CALCULATION LOGIC 🔥
+            final_pnl_list = []
+            for _, row in display_df.iterrows():
+                try:
+                    entry = float(str(row['Entry Price']).replace(',', ''))
+                    
+                    # Agar target hit hua toh Target price lo, warna SL price lo
+                    if row['Status'] == 'TARGET HIT':
+                        exit_price = float(str(row['Target Price']).replace(',', ''))
+                    else:
+                        exit_price = float(str(row['SL Level']).replace(',', ''))
+                    
+                    # Exact Booked P&L Percentage calculation
+                    pnl_pct = ((exit_price - entry) / entry) * 100
+                    final_pnl_list.append(f"{pnl_pct:+.2f}%")
+                except:
+                    final_pnl_list.append("--")
+            
+            # Naya locked column dataframe me daal diya
+            display_df['Locked Final P&L'] = final_pnl_list
+            
+            # 'Locked Final P&L' column ko 'Status' se theek pehle shift karne ka code
+            cols = display_df.columns.tolist()
+            cols.insert(cols.index('Status'), cols.pop(cols.index('Locked Final P&L')))
+            display_df = display_df[cols]
             
             st.dataframe(
                 display_df,
