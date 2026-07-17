@@ -386,11 +386,11 @@ if not df.empty:
                     final_pnl_list.append("--")
             
             # Naya locked column dataframe me daal diya
-            display_df['Locked Final P&L'] = final_pnl_list
+            display_df['Trade P&L'] = final_pnl_list
             
-            # 'Locked Final P&L' column ko 'Status' se theek pehle shift karne ka code
+            # 'Trade P&L' column ko 'Status' se theek pehle shift karne ka code
             cols = display_df.columns.tolist()
-            cols.insert(cols.index('Status'), cols.pop(cols.index('Locked Final P&L')))
+            cols.insert(cols.index('Status'), cols.pop(cols.index('Trade P&L')))
             display_df = display_df[cols]
             
             st.dataframe(
