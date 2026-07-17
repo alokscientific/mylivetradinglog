@@ -367,8 +367,15 @@ if not df.empty:
             # Keep only columns that actually exist in the sheet to prevent errors
             existing_cols = [col for col in display_columns if col in history_df.columns]
             
+            # Ek nayi copy banayenge taaki original data disturb na ho
+            display_df = history_df[existing_cols].copy()
+            
+            # 🔥 YAHAN MAIN FIX HAI: Column ka naam rename kar diya viewer ke liye
+            if 'Live P&L %' in display_df.columns:
+                display_df.rename(columns={'Live P&L %': 'Final P&L %'}, inplace=True)
+            
             st.dataframe(
-                history_df[existing_cols],
+                display_df,
                 use_container_width=True,
                 hide_index=True
             )
