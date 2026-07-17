@@ -357,11 +357,21 @@ if not df.empty:
         if history_df.empty:
             st.info("No closed logs found in the database.")
         else:
-            cols = st.columns(4)
-            history_df = history_df.reset_index(drop=True)
-            for index, row in history_df.iterrows():
-                with cols[index % 4]:
-                    draw_card(row)
+            # Table format setup for history
+            display_columns = [
+                'Stock Symbol', 'Company Name', 'Entry Date', 
+                'Entry Price', 'Target Price', 'SL Level', 
+                'Hit Date', 'Live P&L %', 'Status'
+            ]
+            
+            # Keep only columns that actually exist in the sheet to prevent errors
+            existing_cols = [col for col in display_columns if col in history_df.columns]
+            
+            st.dataframe(
+                history_df[existing_cols],
+                use_container_width=True,
+                hide_index=True
+            )
 else:
     st.warning("⚠️ Critical: Data feed interrupted or source is empty.")
 
