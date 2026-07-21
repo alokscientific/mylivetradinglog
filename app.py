@@ -427,11 +427,13 @@ if not df.empty:
     # ==========================================
     # TRADE HISTORY TAB KELIYE COMPLETE CODE
     # ==========================================
+    # ==========================================
+    # TRADE HISTORY TAB KELIYE COMPLETE CODE
+    # ==========================================
     with tab2:
         st.header("📜 Trade History")
         
         # FIX: Aapke code me closed trades ka data 'closed_trades_df' naam se save hai.
-        # Isliye hum usko history_df me copy kar rahe hain taaki neeche ka code smooth chale.
         history_df = closed_trades_df.copy()
         
         if not history_df.empty:
@@ -443,23 +445,22 @@ if not df.empty:
 
             # Number of days calculate karna (Hit Date - Entry Date)
             history_df['Days Held'] = (history_df['Hit Date'] - history_df['Entry Date']).dt.days
-            # Jo blank ya 'None' the, wahan error na aaye isliye usko 0 kar rahe hain
             history_df['Days Held'] = history_df['Days Held'].fillna(0).astype(int)
 
-            # Cumulative P&L ko number me badalne ka function (jisme %, + hata diya jaye)
+            # Cumulative P&L ko number me badalne ka function
             def clean_pnl(val):
                 if pd.isna(val) or val == 'None' or val == '':
                     return 0.0
                 return float(str(val).replace('%', '').replace('+', '').strip())
 
-            # Calculation ke liye ek hidden column banaya
-            history_df['P&L_Num'] = history_df['Trade P&L'].apply(clean_pnl)
+            # YAHAN FIX KIYA HAI: 'Trade P&L' ki jagah 'Live P&L %'
+            history_df['P&L_Num'] = history_df['Live P&L %'].apply(clean_pnl)
 
             # Totals nikalna
             total_cumulative_pnl = history_df['P&L_Num'].sum()
             total_cumulative_days = history_df['Days Held'].sum()
 
-            # --- 2. TOP METRICS DIKHANA (DASHBOARD WALE CUMULATIVE NUMBERS) ---
+            # --- 2. TOP METRICS DIKHANA ---
             st.markdown("### 📊 Overall Performance")
             col1, col2 = st.columns(2)
             with col1:
@@ -467,33 +468,33 @@ if not df.empty:
             with col2:
                 st.metric(label="Cumulative Days in Trades", value=f"{total_cumulative_days} Days")
             
-            st.divider() # Ek horizontal line
+            st.divider()
 
             # --- 3. COLOR CODING FUNCTIONS ---
             def color_status(val):
                 val_str = str(val).strip().upper()
                 if val_str == 'TARGET HIT':
-                    return 'color: #00FF00;' # Green
+                    return 'color: #00FF00;' 
                 elif val_str == 'SL HIT':
-                    return 'color: #FF0000;' # Red
+                    return 'color: #FF0000;' 
                 return ''
 
             def color_pnl(val):
                 val_str = str(val)
                 if '+' in val_str:
-                    return 'color: #00FF00;' # Green
+                    return 'color: #00FF00;' 
                 elif '-' in val_str:
-                    return 'color: #FF0000;' # Red
+                    return 'color: #FF0000;' 
                 return ''
 
             # --- 4. TABLE STYLING AUR DISPLAY KARIEN ---
             
-            # P&L_Num column ki table me zaroorat nahi hai, toh display se pehle hata diya
+            # P&L_Num column ko hata rahe hain
             display_df = history_df.drop(columns=['P&L_Num'])
 
-            # Style apply karna: Date ko wapas proper format me dikhane ke liye aur colors ke liye
+            # YAHAN BHI FIX KIYA HAI: subset=['Live P&L %']
             styled_history_df = display_df.style.applymap(color_status, subset=['Status']) \
-                                                .applymap(color_pnl, subset=['Trade P&L']) \
+                                                .applymap(color_pnl, subset=['Live P&L %']) \
                                                 .format({"Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None",
                                                          "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None"})
 
@@ -501,8 +502,6 @@ if not df.empty:
             st.dataframe(styled_history_df, use_container_width=True, hide_index=True)
 
         else:
-            # Agar sheet me koi closed trade nahi hai
             st.info("No closed trades found in history yet.")
-
 time.sleep(5)
 st.rerun()
