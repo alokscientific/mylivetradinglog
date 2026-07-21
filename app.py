@@ -49,19 +49,19 @@ html, body, p, span, div {
     margin-left: 24px;
 }
 
-/* Card Design - Adaptive Blue Outline & Hover Effects */
+/* 🔥 UPDATED: Card Design - Solid Blue Outline & Hover Glow 🔥 */
 div[data-testid="stVerticalBlockBorderWrapper"] {
-    border: 1px solid rgba(59, 130, 246, 0.3) !important;
+    border: 1px solid #3b82f6 !important; /* Yahan solid blue color set kiya hai */
     border-top: 4px solid #2563eb !important;
     border-radius: 10px !important;
     background-color: transparent !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2) !important;
     padding: 1rem !important;
     transition: all 0.3s ease;
 }
 div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-    border-color: rgba(59, 130, 246, 0.8) !important;
-    box-shadow: 0 4px 25px rgba(37, 99, 235, 0.2) !important;
+    border-color: #60a5fa !important; /* Hover par aur bright blue */
+    box-shadow: 0 4px 25px rgba(59, 130, 246, 0.3) !important; /* Blue shadow/glow */
     transform: translateY(-2px);
 }
 
