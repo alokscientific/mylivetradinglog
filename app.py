@@ -191,19 +191,17 @@ def load_data():
 
 df = load_data()
 
-def get_pnl_html(val_raw):
+# 🔥 DIRECT HTML P&L GENERATOR 🔥
+def get_pnl_html(val):
     try:
-        if pd.isna(val_raw): 
+        if pd.isna(val) or val == "" or val == "--":
             return '<span class="pnl-value">0.00%</span>'
-        
-        val_str = str(val_raw).strip()
-        
-        if '%' in val_str:
-            val = float(val_str.replace('%', '').replace(',', ''))
-        else:
-            val = float(val_str.replace(',', ''))
-            if abs(val) < 1.0 and val != 0:
-                val = val * 100
+            
+        if isinstance(val, str):
+            if '%' in val:
+                val = float(val.replace('%', '').replace(',', ''))
+            else:
+                val = float(val.replace(',', ''))
                 
         if val > 0:
             return f'<span class="pnl-value text-green">+{val:.2f}%</span>'
@@ -253,7 +251,8 @@ def draw_card(row):
         </div>
         """, unsafe_allow_html=True)
 
-        live_p = row.get('Live Price', 0)
+        live_p_raw = row.get('Live Price', 0)
+        entry_p_raw = row.get('Entry Price', 0)
         
         yf_change = get_yahoo_change(raw_symbol)
         if yf_change:
@@ -272,12 +271,26 @@ def draw_card(row):
 
         c1, c2 = st.columns(2)
         with c1:
-            st.metric(label="LIVE PRICE", value=f"₹{live_p}", delta=change_str)
+            st.metric(label="LIVE PRICE", value=f"₹{live_p_raw}", delta=change_str)
         with c2:
+            # 🚀 ON-THE-FLY DIRECT P&L CALCULATION LOGIC 🚀
             if status == "WAITING":
                 pnl_html = '<span class="pnl-value" style="opacity: 0.5;">--</span>'
             else:
-                pnl_html = get_pnl_html(row.get('Live P&L %', 0))
+                calculated_pnl = 0.0
+                if status == "IN TRADE":
+                    try:
+                        e_val = float(str(entry_p_raw).replace(',', ''))
+                        l_val = float(str(live_p_raw).replace(',', ''))
+                        if e_val > 0 and l_val > 0:
+                            calculated_pnl = ((l_val - e_val) / e_val) * 100
+                    except:
+                        pass
+                else:
+                    # Fallback for closed trades if needed
+                    calculated_pnl = row.get('Live P&L %', 0)
+
+                pnl_html = get_pnl_html(calculated_pnl)
                 
             st.markdown(f"""
             <div class="pnl-container">
@@ -286,7 +299,6 @@ def draw_card(row):
             </div>
             """, unsafe_allow_html=True)
 
-        entry_p = row.get('Entry Price', 0)
         tgt = row.get('Target Price', 0)
         sl = row.get('SL Level', 0)
         
@@ -294,7 +306,7 @@ def draw_card(row):
         <div class="data-grid">
             <div class="data-item">
                 <span class="data-label">ENTRY POINT</span>
-                <span class="data-value">₹{entry_p}</span>
+                <span class="data-value">₹{entry_p_raw}</span>
             </div>
             <div class="data-item">
                 <span class="data-label">TARGET</span>
@@ -337,7 +349,6 @@ if not df.empty:
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
 
-    # Function to parse percentages securely
     def extract_raw_val(val_raw):
         try:
             if pd.isna(val_raw): return 0.0
@@ -352,11 +363,17 @@ if not df.empty:
         except:
             return 0.0
 
-    # 🔥 SAFE CALCULATION LOGIC (To prevent KeyErrors) 🔥
-    if 'Live P&L %' in active_trades_df.columns:
-        cumulative_pnl = sum(active_trades_df['Live P&L %'].apply(extract_raw_val))
-    else:
-        cumulative_pnl = 0.0
+    # 🔥 SAFE ON-THE-FLY CUMULATIVE P&L CALCULATION
+    cumulative_pnl = 0.0
+    for _, row in active_trades_df.iterrows():
+        try:
+            e_val = float(str(row.get('Entry Price', 0)).replace(',', ''))
+            l_val = float(str(row.get('Live Price', 0)).replace(',', ''))
+            if e_val > 0 and l_val > 0:
+                trade_pnl_pct = ((l_val - e_val) / e_val) * 100
+                cumulative_pnl += trade_pnl_pct
+        except:
+            pass
 
     if "Today's Change" in active_trades_df.columns:
         today_change_pnl = sum(active_trades_df["Today's Change"].apply(extract_raw_val))
