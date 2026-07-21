@@ -424,48 +424,87 @@ if not df.empty:
                 with cols[index % 4]:
                     draw_card(row)
 
-    with tab2:
-        if closed_trades_df.empty:
-            st.info("No closed logs found in the database.")
-        else:
-            display_columns = [
-                'Stock Symbol', 'Company Name', 'Entry Date', 
-                'Entry Price', 'Target Price', 'SL Level', 
-                'Hit Date', 'Status'
-            ]
-            
-            existing_cols = [col for col in display_columns if col in closed_trades_df.columns]
-            display_df = closed_trades_df[existing_cols].copy()
-            
-            # EXACT LOCKED P&L CALCULATION LOGIC
-            final_pnl_list = []
-            for _, row in display_df.iterrows():
-                try:
-                    entry = float(str(row['Entry Price']).replace(',', ''))
-                    
-                    if row['Status'] == 'TARGET HIT':
-                        exit_price = float(str(row['Target Price']).replace(',', ''))
-                    else:
-                        exit_price = float(str(row['SL Level']).replace(',', ''))
-                    
-                    pnl_pct = ((exit_price - entry) / entry) * 100
-                    final_pnl_list.append(f"{pnl_pct:+.2f}%")
-                except:
-                    final_pnl_list.append("--")
-            
-            display_df['Trade P&L'] = final_pnl_list
-            
-            cols = display_df.columns.tolist()
-            cols.insert(cols.index('Status'), cols.pop(cols.index('Trade P&L')))
-            display_df = display_df[cols]
-            
-            st.dataframe(
-                display_df,
-                use_container_width=True,
-                hide_index=True
-            )
-else:
-    st.warning("⚠️ Critical: Data feed interrupted or source is empty.")
+    # ==========================================
+# TRADE HISTORY TAB KELIYE COMPLETE CODE
+# ==========================================
+
+# Dhyan dein: Yahan 'tab2' aapke Trade History tab ka variable hai. 
+# Agar aapne koi aur naam (jaise tab_history) rakha hai, toh usko change kar lein.
+with tab2:
+    st.header("📜 Trade History")
+    
+    # Yahan hum maan rahe hain ki aapne Google Sheet se data laakar 
+    # 'history_df' naam ke DataFrame mein save kar liya hai.
+    
+    if not history_df.empty:
+        # --- 1. DATA CLEANING & CALCULATION ---
+        
+        # 'Entry Date' aur 'Hit Date' ko strings se real Date format me badalna
+        history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
+        history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
+
+        # Number of days calculate karna (Hit Date - Entry Date)
+        history_df['Days Held'] = (history_df['Hit Date'] - history_df['Entry Date']).dt.days
+        # Jo blank ya 'None' the, wahan error na aaye isliye usko 0 kar rahe hain
+        history_df['Days Held'] = history_df['Days Held'].fillna(0).astype(int)
+
+        # Cumulative P&L ko number me badalne ka function (jisme %, + hata diya jaye)
+        def clean_pnl(val):
+            if pd.isna(val) or val == 'None' or val == '':
+                return 0.0
+            return float(str(val).replace('%', '').replace('+', '').strip())
+
+        # Calculation ke liye ek hidden column banaya
+        history_df['P&L_Num'] = history_df['Trade P&L'].apply(clean_pnl)
+
+        # Totals nikalna
+        total_cumulative_pnl = history_df['P&L_Num'].sum()
+        total_cumulative_days = history_df['Days Held'].sum()
+
+        # --- 2. TOP METRICS DIKHANA (DASHBOARD WALE CUMULATIVE NUMBERS) ---
+        st.markdown("### 📊 Overall Performance")
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric(label="Cumulative P&L", value=f"{total_cumulative_pnl:.2f}%")
+        with col2:
+            st.metric(label="Cumulative Days in Trades", value=f"{total_cumulative_days} Days")
+        
+        st.divider() # Ek horizontal line
+
+        # --- 3. COLOR CODING FUNCTIONS ---
+        def color_status(val):
+            val_str = str(val).strip().upper()
+            if val_str == 'TARGET HIT':
+                return 'color: #00FF00;' # Green
+            elif val_str == 'SL HIT':
+                return 'color: #FF0000;' # Red
+            return ''
+
+        def color_pnl(val):
+            val_str = str(val)
+            if '+' in val_str:
+                return 'color: #00FF00;' # Green
+            elif '-' in val_str:
+                return 'color: #FF0000;' # Red
+            return ''
+
+        # --- 4. TABLE STYLING AUR DISPLAY KARIEN ---
+        
+        # P&L_Num column ki table me zaroorat nahi hai, toh display se pehle hata diya
+        display_df = history_df.drop(columns=['P&L_Num'])
+
+        # Style apply karna: Date ko wapas proper format me dikhane ke liye aur colors ke liye
+        styled_history_df = display_df.style.applymap(color_status, subset=['Status']) \
+                                            .applymap(color_pnl, subset=['Trade P&L']) \
+                                            .format({"Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None",
+                                                     "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None"})
+
+        # Final Table dikhana
+        st.dataframe(styled_history_df, use_container_width=True, hide_index=True)
+
+    else:
+        # Agar sheet me koi closed trade nahi hai
+        st.info("No closed trades found in history yet.")
 
 time.sleep(5)
 st.rerun()
