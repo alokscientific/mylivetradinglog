@@ -444,42 +444,52 @@ if not df.empty:
             history_df['Days Held'] = (history_df['Hit Date'] - history_df['Entry Date']).dt.days
             history_df['Days Held'] = history_df['Days Held'].fillna(0).astype(int)
 
-            # Cumulative P&L aur Numbers ko clean karke float (decimal) me badalna
+            # Numbers ko clean karke float (decimal) me badalna
             def clean_number(val):
                 if pd.isna(val) or val == 'None' or val == '':
                     return 0.0
                 return float(str(val).replace('%', '').replace('+', '').replace(',', '').strip())
 
-            # Hidden column math calculation ke liye
-            history_df['P&L_Num'] = history_df['Live P&L %'].apply(clean_number)
+            # 🔥 NAYA SMART LOGIC: STATUS KE HISAB SE ACTUAL P&L 🔥
+            def calculate_closed_pnl(row):
+                status = str(row.get('Status', '')).strip().upper()
+                if status == 'TARGET HIT':
+                    return clean_number(row.get('Target %', 0))
+                elif status == 'SL HIT':
+                    # Stop loss hai toh return ko automatically negative bana dega
+                    return -abs(clean_number(row.get('SL %', 0)))
+                else:
+                    return 0.0
+
+            # Actual locked P&L column generate karna
+            history_df['Trade P&L (%) Num'] = history_df.apply(calculate_closed_pnl, axis=1)
             history_df['Entry Price Num'] = history_df['Entry Price'].apply(clean_number)
 
-            # Totals nikalna (Closed trades ka exact total)
-            total_cumulative_pnl = history_df['P&L_Num'].sum()
+            # Totals nikalna (Closed trades ka exact locked total)
+            total_cumulative_pnl = history_df['Trade P&L (%) Num'].sum()
             total_cumulative_days = history_df['Days Held'].sum()
 
             # --- 2. TOP METRICS DIKHANA ---
             st.markdown("### 📊 Overall Performance")
             col1, col2 = st.columns(2)
             with col1:
-                # 2 digit decimal aur plus/minus sign ke sath
-                st.metric(label="Closed Trade Cumulative P&L", value=f"{total_cumulative_pnl:+.2f}%")
+                st.metric(label="Cumulative P&L", value=f"{total_cumulative_pnl:+.2f}%")
             with col2:
-                st.metric(label="Number of days", value=f"{total_cumulative_days} Days")
+                st.metric(label="Cumulative Days in Trades", value=f"{total_cumulative_days} Days")
             
             st.divider()
 
             # --- 3. FILTER & RENAME COLUMNS ---
-            # Sirf wahi columns select kar rahe hain jo closed trade me chahiye
-            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Days Held', 'Entry Price Num', 'Live P&L %', 'Status']
+            # Dashboard ke display ke liye clean column setup karna
+            history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
             
-            # Jo column actually sheet me hain, sirf unko filter karna (Error bachane ke liye)
+            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Days Held', 'Entry Price Num', 'Trade P&L (%)', 'Status']
+            
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
 
             # Columns ko clean naam dena
             display_df = display_df.rename(columns={
-                'Live P&L %': 'Trade P&L (%)',
                 'Entry Price Num': 'Entry Price'
             })
 
@@ -502,12 +512,11 @@ if not df.empty:
 
             # --- 5. TABLE STYLING & 2-DECIMAL FORMATTING ---
             
-            # Format rules: Date wapas text me, Price aur P&L strictly 2 decimals me
             format_dict = {
                 "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
-                "Entry Price": "{:.2f}",  # Point ke baad sirf 2 digit
-                "Trade P&L (%)": lambda x: f"{clean_number(x):+.2f}%" # Point ke baad sirf 2 digit aur % ka sign
+                "Entry Price": "{:.2f}",  
+                "Trade P&L (%)": lambda x: f"{clean_number(x):+.2f}%" 
             }
 
             styled_history_df = display_df.style.map(color_status, subset=['Status']) \
