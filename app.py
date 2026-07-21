@@ -61,6 +61,17 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     transform: translateY(-2px);
 }
 
+/* Expander Overlap Fix */
+[data-testid="stExpander"] details {
+    border: 1px solid rgba(148, 163, 184, 0.2) !important;
+    border-radius: 6px !important;
+    background-color: rgba(148, 163, 184, 0.02) !important;
+}
+[data-testid="stExpander"] summary p {
+    font-weight: 700 !important;
+    font-size: 0.85rem !important;
+}
+
 /* Data Grid Layout */
 .data-grid {
     display: grid;
@@ -191,28 +202,7 @@ def load_data():
 
 df = load_data()
 
-# 🔥 DIRECT HTML P&L GENERATOR 🔥
-def get_pnl_html(val):
-    try:
-        if pd.isna(val) or val == "" or val == "--":
-            return '<span class="pnl-value">0.00%</span>'
-            
-        if isinstance(val, str):
-            if '%' in val:
-                val = float(val.replace('%', '').replace(',', ''))
-            else:
-                val = float(val.replace(',', ''))
-                
-        if val > 0:
-            return f'<span class="pnl-value text-green">+{val:.2f}%</span>'
-        elif val < 0:
-            return f'<span class="pnl-value text-red">{val:.2f}%</span>'
-        else:
-            return f'<span class="pnl-value">0.00%</span>'
-    except:
-        return '<span class="pnl-value">0.00%</span>'
-
-# 🔥 NEW COMPACT CARD DESIGN WITH EXPANDER 🔥
+# 🔥 COMPACT CARD DESIGN WITH CLEAN EXPANDER 🔥
 def draw_card(row):
     with st.container(border=True):
         raw_symbol = str(row['Stock Symbol']).strip()
@@ -285,7 +275,7 @@ def draw_card(row):
                 pnl_html = f'<span style="font-weight: 800;">0.00%</span>'
 
         # ==========================================
-        # 1. VISIBLE COMPACT HEADER (Yeh hamesha dikhega)
+        # 1. VISIBLE COMPACT HEADER
         # ==========================================
         st.markdown(f"""
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
@@ -305,7 +295,7 @@ def draw_card(row):
         """, unsafe_allow_html=True)
 
         # ==========================================
-        # 2. EXPANDABLE DETAILS (Dropdown ke andar wala hissa)
+        # 2. EXPANDABLE DETAILS (FIXED OVERLAP)
         # ==========================================
         with st.expander("View Trade Details"):
             st.markdown(f"""
@@ -354,10 +344,6 @@ def draw_card(row):
                 st.link_button("CHART", f"https://in.tradingview.com/chart/?symbol={raw_symbol}", use_container_width=True)
 
 if not df.empty:
-    
-    # ==========================================
-    # 🚀 PORTFOLIO SUMMARY DASHBOARD (SAFE MODE)
-    # ==========================================
     active_trades_df = df[df['Status'].isin(["IN TRADE"])]
     closed_trades_df = df[df['Status'].isin(["SL HIT", "TARGET HIT"])]
     
@@ -378,7 +364,6 @@ if not df.empty:
         except:
             return 0.0
 
-    # 🔥 SAFE ON-THE-FLY CUMULATIVE P&L CALCULATION
     cumulative_pnl = 0.0
     for _, row in active_trades_df.iterrows():
         try:
@@ -395,7 +380,6 @@ if not df.empty:
     else:
         today_change_pnl = 0.0
 
-    # Determine Colors and Signs
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
     pnl_sign = "+" if cumulative_pnl > 0 else ""
     
@@ -404,7 +388,6 @@ if not df.empty:
 
     st.markdown("##### 🚀 Portfolio Snapshot")
     
-    # Custom HTML Summary Cards
     st.markdown(f"""
     <div style="display: flex; gap: 15px; margin-bottom: 25px;">
         <div style="flex: 1; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
@@ -424,7 +407,6 @@ if not df.empty:
         </div>
     </div>
     """, unsafe_allow_html=True)
-    # ==========================================
 
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
@@ -439,52 +421,37 @@ if not df.empty:
                 with cols[index % 4]:
                     draw_card(row)
 
-    # ==========================================
-    # TRADE HISTORY TAB KELIYE COMPLETE CODE
-    # ==========================================
     with tab2:
         st.header("📜 Trade History")
-        
-        # Closed trades ka data copy kar rahe hain
         history_df = closed_trades_df.copy()
         
         if not history_df.empty:
-            # --- 1. DATA CLEANING & CALCULATION ---
-            
-            # Dates ko proper format me convert karna
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
-            # Days Held nikalna (Hit Date - Entry Date)
             history_df['Days Held'] = (history_df['Hit Date'] - history_df['Entry Date']).dt.days
             history_df['Days Held'] = history_df['Days Held'].fillna(0).astype(int)
 
-            # Numbers ko clean karke float (decimal) me badalna
             def clean_number(val):
                 if pd.isna(val) or val == 'None' or val == '':
                     return 0.0
                 return float(str(val).replace('%', '').replace('+', '').replace(',', '').strip())
 
-            # 🔥 NAYA SMART LOGIC: STATUS KE HISAB SE ACTUAL P&L 🔥
             def calculate_closed_pnl(row):
                 status = str(row.get('Status', '')).strip().upper()
                 if status == 'TARGET HIT':
                     return clean_number(row.get('Target %', 0))
                 elif status == 'SL HIT':
-                    # Stop loss hai toh return ko automatically negative bana dega
                     return -abs(clean_number(row.get('SL %', 0)))
                 else:
                     return 0.0
 
-            # Actual locked P&L column generate karna
             history_df['Trade P&L (%) Num'] = history_df.apply(calculate_closed_pnl, axis=1)
             history_df['Entry Price Num'] = history_df['Entry Price'].apply(clean_number)
 
-            # Totals nikalna (Closed trades ka exact locked total)
             total_cumulative_pnl = history_df['Trade P&L (%) Num'].sum()
             total_cumulative_days = history_df['Days Held'].sum()
 
-            # --- 2. TOP METRICS DIKHANA ---
             st.markdown("### 📊 Overall Performance")
             col1, col2 = st.columns(2)
             with col1:
@@ -494,21 +461,13 @@ if not df.empty:
             
             st.divider()
 
-            # --- 3. FILTER & RENAME COLUMNS ---
-            # Dashboard ke display ke liye clean column setup karna
             history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
-            
             columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Days Held', 'Entry Price Num', 'Trade P&L (%)', 'Status']
-            
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
 
-            # Columns ko clean naam dena
-            display_df = display_df.rename(columns={
-                'Entry Price Num': 'Entry Price'
-            })
+            display_df = display_df.rename(columns={'Entry Price Num': 'Entry Price'})
 
-            # --- 4. COLOR CODING FUNCTIONS ---
             def color_status(val):
                 val_str = str(val).strip().upper()
                 if val_str == 'TARGET HIT':
@@ -525,8 +484,6 @@ if not df.empty:
                     return 'color: #FF0000;' 
                 return ''
 
-            # --- 5. TABLE STYLING & 2-DECIMAL FORMATTING ---
-            
             format_dict = {
                 "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
@@ -538,9 +495,7 @@ if not df.empty:
                                                 .map(color_pnl, subset=['Trade P&L (%)']) \
                                                 .format(format_dict)
 
-            # Final Table dikhana
             st.dataframe(styled_history_df, use_container_width=True, hide_index=True)
-
         else:
             st.info("No closed trades found in history yet.")
             
