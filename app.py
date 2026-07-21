@@ -10,7 +10,7 @@ import time
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
 # Architectural & Dual-Theme (Light/Dark) Adaptive CSS
-st.markdown("""
+st.markdown('''
 <style>
 /* Font Setup */
 html, body, [class*="st-"] {
@@ -124,15 +124,15 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     font-size: 0.8rem;
 }
 </style>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 
 # Properly Aligned Header Module
-st.markdown("""
+st.markdown('''
 <div class="header-container">
     <div class="main-title">TRADE LOG SYSTEM</div>
     <div class="sub-title">Track & Trade Terminal</div>
 </div>
-""", unsafe_allow_html=True)
+''', unsafe_allow_html=True)
 st.divider()
 
 # Live Real-Time Change from Yahoo Finance
@@ -240,7 +240,7 @@ def draw_card(row):
             date_str += f" &nbsp;|&nbsp; EXIT: {hit_date}"
 
         # Header Module
-        st.markdown(f"""
+        st.markdown(f'''
         <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
             <div>
                 <div style="font-weight: 900; font-size: 1.3rem; line-height: 1.1;">{clean_symbol}</div>
@@ -249,7 +249,7 @@ def draw_card(row):
             </div>
             <div>{status_html}</div>
         </div>
-        """, unsafe_allow_html=True)
+        ''', unsafe_allow_html=True)
 
         live_p_raw = row.get('Live Price', 0)
         entry_p_raw = row.get('Entry Price', 0)
@@ -287,22 +287,21 @@ def draw_card(row):
                     except:
                         pass
                 else:
-                    # Fallback for closed trades if needed
                     calculated_pnl = row.get('Live P&L %', 0)
 
                 pnl_html = get_pnl_html(calculated_pnl)
                 
-            st.markdown(f"""
+            st.markdown(f'''
             <div class="pnl-container">
                 <div class="st-emotion-cache-1qmj432" style="font-size: 0.75rem; font-weight: 600; opacity: 0.7; text-transform: uppercase;">LIVE P&L</div>
                 {pnl_html}
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
 
         tgt = row.get('Target Price', 0)
         sl = row.get('SL Level', 0)
         
-        st.markdown(f"""
+        st.markdown(f'''
         <div class="data-grid">
             <div class="data-item">
                 <span class="data-label">ENTRY POINT</span>
@@ -317,10 +316,10 @@ def draw_card(row):
                 <span class="data-value text-red">₹{sl}</span>
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        ''', unsafe_allow_html=True)
         
         latest_news = get_live_news(company_name)
-        st.markdown(f"""
+        st.markdown(f'''
         <div class="news-section">
             <span class="news-icon">📰</span> 
             <marquee class="news-marquee" scrollamount="4" onmouseover="this.stop();" onmouseout="this.start();">
@@ -329,7 +328,7 @@ def draw_card(row):
                 </a>
             </marquee>
         </div>
-        """, unsafe_allow_html=True)
+        ''', unsafe_allow_html=True)
         
         btn1, btn2 = st.columns(2)
         with btn1:
@@ -349,23 +348,12 @@ if not df.empty:
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
 
-    def extract_raw_val(val_raw):
-        try:
-            if pd.isna(val_raw): return 0.0
-            val_str = str(val_raw).strip()
-            if '%' in val_str:
-                return float(val_str.replace('%', '').replace(',', ''))
-            else:
-                val = float(val_str.replace(',', ''))
-                if abs(val) < 1.0 and val != 0:
-                    return val * 100
-                return val
-        except:
-            return 0.0
-
-    # 🔥 SAFE ON-THE-FLY CUMULATIVE P&L CALCULATION
+    # 🔥 ROBUST YFINANCE DRIVEN P&L AND DAILY CHANGE 🔥
     cumulative_pnl = 0.0
+    today_change_pnl = 0.0
+
     for _, row in active_trades_df.iterrows():
+        # 1. Cumulative P&L Calculation
         try:
             e_val = float(str(row.get('Entry Price', 0)).replace(',', ''))
             l_val = float(str(row.get('Live Price', 0)).replace(',', ''))
@@ -374,11 +362,23 @@ if not df.empty:
                 cumulative_pnl += trade_pnl_pct
         except:
             pass
-
-    if "Today's Change" in active_trades_df.columns:
-        today_change_pnl = sum(active_trades_df["Today's Change"].apply(extract_raw_val))
-    else:
-        today_change_pnl = 0.0
+            
+        # 2. Today's Change Calculation (Bypassing Sheet, using Native Engine)
+        raw_symbol = str(row['Stock Symbol']).strip()
+        try:
+            yf_sym = raw_symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
+            if "BSE:" in raw_symbol: 
+                yf_sym = raw_symbol.replace("BSE:", "") + ".BO"
+                
+            tkr = yf.Ticker(yf_sym)
+            prev = tkr.fast_info.get('previous_close')
+            curr = tkr.fast_info.get('last_price')
+            
+            if prev and curr and prev > 0:
+                pct = ((curr - prev) / prev) * 100
+                today_change_pnl += pct
+        except:
+            pass
 
     # Determine Colors and Signs
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
@@ -390,7 +390,7 @@ if not df.empty:
     st.markdown("##### 🚀 Portfolio Snapshot")
     
     # Custom HTML Summary Cards
-    st.markdown(f"""
+    st.markdown(f'''
     <div style="display: flex; gap: 15px; margin-bottom: 25px;">
         <div style="flex: 1; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
             <div style="font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Active Trades</div>
@@ -408,7 +408,7 @@ if not df.empty:
             </div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    ''', unsafe_allow_html=True)
     # ==========================================
 
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
