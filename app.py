@@ -492,9 +492,9 @@ if not df.empty:
             # P&L_Num column ko hata rahe hain
             display_df = history_df.drop(columns=['P&L_Num'])
 
-            # YAHAN BHI FIX KIYA HAI: subset=['Live P&L %']
-            styled_history_df = display_df.style.applymap(color_status, subset=['Status']) \
-                                                .applymap(color_pnl, subset=['Live P&L %']) \
+            # YAHAN FIX KIYA HAI: 'applymap' ki jagah ab naya 'map' function use kiya hai
+            styled_history_df = display_df.style.map(color_status, subset=['Status']) \
+                                                .map(color_pnl, subset=['Live P&L %']) \
                                                 .format({"Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None",
                                                          "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None"})
 
