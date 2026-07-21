@@ -424,39 +424,37 @@ if not df.empty:
                 with cols[index % 4]:
                     draw_card(row)
 
-    # ==========================================
-    # TRADE HISTORY TAB KELIYE COMPLETE CODE
-    # ==========================================
-    # ==========================================
+# ==========================================
     # TRADE HISTORY TAB KELIYE COMPLETE CODE
     # ==========================================
     with tab2:
         st.header("📜 Trade History")
         
-        # FIX: Aapke code me closed trades ka data 'closed_trades_df' naam se save hai.
+        # Closed trades ka data copy kar rahe hain
         history_df = closed_trades_df.copy()
         
         if not history_df.empty:
             # --- 1. DATA CLEANING & CALCULATION ---
             
-            # 'Entry Date' aur 'Hit Date' ko strings se real Date format me badalna
+            # Dates ko proper format me convert karna
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
-            # Number of days calculate karna (Hit Date - Entry Date)
+            # Days Held nikalna (Hit Date - Entry Date)
             history_df['Days Held'] = (history_df['Hit Date'] - history_df['Entry Date']).dt.days
             history_df['Days Held'] = history_df['Days Held'].fillna(0).astype(int)
 
-            # Cumulative P&L ko number me badalne ka function
-            def clean_pnl(val):
+            # Cumulative P&L aur Numbers ko clean karke float (decimal) me badalna
+            def clean_number(val):
                 if pd.isna(val) or val == 'None' or val == '':
                     return 0.0
-                return float(str(val).replace('%', '').replace('+', '').strip())
+                return float(str(val).replace('%', '').replace('+', '').replace(',', '').strip())
 
-            # YAHAN FIX KIYA HAI: 'Trade P&L' ki jagah 'Live P&L %'
-            history_df['P&L_Num'] = history_df['Live P&L %'].apply(clean_pnl)
+            # Hidden column math calculation ke liye
+            history_df['P&L_Num'] = history_df['Live P&L %'].apply(clean_number)
+            history_df['Entry Price Num'] = history_df['Entry Price'].apply(clean_number)
 
-            # Totals nikalna
+            # Totals nikalna (Closed trades ka exact total)
             total_cumulative_pnl = history_df['P&L_Num'].sum()
             total_cumulative_days = history_df['Days Held'].sum()
 
@@ -464,39 +462,57 @@ if not df.empty:
             st.markdown("### 📊 Overall Performance")
             col1, col2 = st.columns(2)
             with col1:
-                st.metric(label="Closed trade Cumulative P&L", value=f"{total_cumulative_pnl:.2f}%")
+                # 2 digit decimal aur plus/minus sign ke sath
+                st.metric(label="Closed Trade Cumulative P&L", value=f"{total_cumulative_pnl:+.2f}%")
             with col2:
-                st.metric(label="Cumulative Days in Trades", value=f"{total_cumulative_days} Days")
+                st.metric(label="Number of days", value=f"{total_cumulative_days} Days")
             
             st.divider()
 
-            # --- 3. COLOR CODING FUNCTIONS ---
+            # --- 3. FILTER & RENAME COLUMNS ---
+            # Sirf wahi columns select kar rahe hain jo closed trade me chahiye
+            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Days Held', 'Entry Price Num', 'Live P&L %', 'Status']
+            
+            # Jo column actually sheet me hain, sirf unko filter karna (Error bachane ke liye)
+            columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
+            display_df = history_df[columns_to_keep].copy()
+
+            # Columns ko clean naam dena
+            display_df = display_df.rename(columns={
+                'Live P&L %': 'Trade P&L (%)',
+                'Entry Price Num': 'Entry Price'
+            })
+
+            # --- 4. COLOR CODING FUNCTIONS ---
             def color_status(val):
                 val_str = str(val).strip().upper()
                 if val_str == 'TARGET HIT':
-                    return 'color: #00FF00;' 
+                    return 'color: #00FF00; font-weight: bold;' 
                 elif val_str == 'SL HIT':
-                    return 'color: #FF0000;' 
+                    return 'color: #FF0000; font-weight: bold;' 
                 return ''
 
             def color_pnl(val):
                 val_str = str(val)
-                if '+' in val_str:
+                if '+' in val_str or (isinstance(val, (int, float)) and val > 0):
                     return 'color: #00FF00;' 
-                elif '-' in val_str:
+                elif '-' in val_str or (isinstance(val, (int, float)) and val < 0):
                     return 'color: #FF0000;' 
                 return ''
 
-            # --- 4. TABLE STYLING AUR DISPLAY KARIEN ---
+            # --- 5. TABLE STYLING & 2-DECIMAL FORMATTING ---
             
-            # P&L_Num column ko hata rahe hain
-            display_df = history_df.drop(columns=['P&L_Num'])
+            # Format rules: Date wapas text me, Price aur P&L strictly 2 decimals me
+            format_dict = {
+                "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
+                "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
+                "Entry Price": "{:.2f}",  # Point ke baad sirf 2 digit
+                "Trade P&L (%)": lambda x: f"{clean_number(x):+.2f}%" # Point ke baad sirf 2 digit aur % ka sign
+            }
 
-            # YAHAN FIX KIYA HAI: 'applymap' ki jagah ab naya 'map' function use kiya hai
             styled_history_df = display_df.style.map(color_status, subset=['Status']) \
-                                                .map(color_pnl, subset=['Live P&L %']) \
-                                                .format({"Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None",
-                                                         "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "None"})
+                                                .map(color_pnl, subset=['Trade P&L (%)']) \
+                                                .format(format_dict)
 
             # Final Table dikhana
             st.dataframe(styled_history_df, use_container_width=True, hide_index=True)
