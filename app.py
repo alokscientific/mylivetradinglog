@@ -63,11 +63,11 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
 
 /* Metric text adjustments */
 div[data-testid="stMetricValue"] {
-    font-size: 1.25rem !important; 
+    font-size: 1.5rem !important; 
     font-weight: 800 !important;
 }
 div[data-testid="stMetricLabel"] {
-    font-size: 0.75rem !important;
+    font-size: 0.85rem !important;
     font-weight: 600 !important;
     opacity: 0.7;
     text-transform: uppercase;
@@ -338,6 +338,41 @@ def draw_card(row):
             st.link_button("CHART", f"https://in.tradingview.com/chart/?symbol={raw_symbol}", use_container_width=True)
 
 if not df.empty:
+    
+    # ==========================================
+    # 🚀 NEW ADDITION: PORTFOLIO SUMMARY DASHBOARD
+    # ==========================================
+    active_trades_df = df[df['Status'].isin(["IN TRADE"])]
+    total_active_trades = len(active_trades_df)
+
+    def extract_raw_pnl(val_raw):
+        try:
+            if pd.isna(val_raw): return 0.0
+            val_str = str(val_raw).strip()
+            if '%' in val_str:
+                return float(val_str.replace('%', '').replace(',', ''))
+            else:
+                val = float(val_str.replace(',', ''))
+                if abs(val) < 1.0 and val != 0:
+                    return val * 100
+                return val
+        except:
+            return 0.0
+
+    # Calculate Total Cumulative P&L
+    cumulative_pnl = sum(active_trades_df['Live P&L %'].apply(extract_raw_pnl))
+
+    # Display Metrics at the top
+    st.markdown("##### 🚀 Portfolio Snapshot")
+    sc1, sc2, sc3, sc4 = st.columns(4)
+    with sc1:
+        st.metric(label="TOTAL ACTIVE TRADES", value=total_active_trades)
+    with sc2:
+        st.metric(label="CUMULATIVE P&L", value=f"{cumulative_pnl:+.2f}%")
+        
+    st.divider()
+    # ==========================================
+
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
     with tab1:
