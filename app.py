@@ -325,10 +325,11 @@ def draw_card(row):
         with btn2:
             st.link_button("CHART", f"https://in.tradingview.com/chart/?symbol={raw_symbol}", use_container_width=True)
 
+
 if not df.empty:
     
     # ==========================================
-    # 🚀 PORTFOLIO SUMMARY DASHBOARD (FULLY CUSTOM)
+    # 🚀 PORTFOLIO SUMMARY DASHBOARD (SAFE MODE)
     # ==========================================
     active_trades_df = df[df['Status'].isin(["IN TRADE"])]
     closed_trades_df = df[df['Status'].isin(["SL HIT", "TARGET HIT"])]
@@ -351,9 +352,16 @@ if not df.empty:
         except:
             return 0.0
 
-    # Calculate Values
-    cumulative_pnl = sum(active_trades_df['Live P&L %'].apply(extract_raw_val))
-    today_change_pnl = sum(active_trades_df["Today's Change"].apply(extract_raw_val))
+    # 🔥 SAFE CALCULATION LOGIC (To prevent KeyErrors) 🔥
+    if 'Live P&L %' in active_trades_df.columns:
+        cumulative_pnl = sum(active_trades_df['Live P&L %'].apply(extract_raw_val))
+    else:
+        cumulative_pnl = 0.0
+
+    if "Today's Change" in active_trades_df.columns:
+        today_change_pnl = sum(active_trades_df["Today's Change"].apply(extract_raw_val))
+    else:
+        today_change_pnl = 0.0
 
     # Determine Colors and Signs
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
