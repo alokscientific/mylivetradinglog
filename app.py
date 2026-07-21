@@ -12,9 +12,13 @@ st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide
 # Architectural & Dual-Theme (Light/Dark) Adaptive CSS
 st.markdown("""
 <style>
-/* Font Setup */
-html, body, [class*="st-"] {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+/* 🔥 FIXED FONT SETUP: Protects Streamlit Icons from Overlap 🔥 */
+html, body, p, span, div {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+/* Force Material Icons to retain their original font so they don't show text ligatures */
+.stIconMaterial, [data-testid="stIconMaterial"], .material-symbols-rounded {
+    font-family: 'Material Symbols Rounded' !important;
 }
 
 /* Header Alignment Fix */
@@ -295,7 +299,7 @@ def draw_card(row):
         """, unsafe_allow_html=True)
 
         # ==========================================
-        # 2. EXPANDABLE DETAILS (FIXED OVERLAP)
+        # 2. EXPANDABLE DETAILS
         # ==========================================
         with st.expander("View Trade Details"):
             st.markdown(f"""
