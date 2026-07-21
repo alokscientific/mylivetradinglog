@@ -464,7 +464,7 @@ if not df.empty:
             st.markdown("### 📊 Overall Performance")
             col1, col2 = st.columns(2)
             with col1:
-                st.metric(label="Cumulative P&L", value=f"{total_cumulative_pnl:.2f}%")
+                st.metric(label="Closed trade Cumulative P&L", value=f"{total_cumulative_pnl:.2f}%")
             with col2:
                 st.metric(label="Cumulative Days in Trades", value=f"{total_cumulative_days} Days")
             
