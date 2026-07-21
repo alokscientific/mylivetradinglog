@@ -26,66 +26,71 @@ html, body, p, span, div {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    margin-bottom: 25px;
+    margin-bottom: 20px;
 }
 .main-title {
     background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
     color: white;
-    padding: 10px 24px;
+    padding: 8px 20px;
     border-radius: 8px;
     font-weight: 900;
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     letter-spacing: 1.5px;
     box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     display: inline-block;
 }
 .sub-title {
     color: var(--text-color);
     opacity: 0.7;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
     font-weight: 600;
     letter-spacing: 0.5px;
     margin-left: 24px;
 }
 
-/* 🔥 UPDATED: Card Design - Solid Blue Outline & Hover Glow 🔥 */
-div[data-testid="stVerticalBlockBorderWrapper"] {
-    border: 1px solid #3b82f6 !important; /* Yahan solid blue color set kiya hai */
-    border-top: 4px solid #2563eb !important;
-    border-radius: 10px !important;
+/* 🔥 UPDATED: Card Design - Solid Blue Outline & Space Saver 🔥 */
+/* Removed 'div' selector to support Streamlit's new <fieldset> wrapper */
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border: 1.5px solid #3b82f6 !important; /* Solid Bright Blue */
+    border-top: 4px solid #2563eb !important; /* Thicker Top Blue Border */
+    border-radius: 8px !important;
     background-color: transparent !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2) !important;
-    padding: 1rem !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+    padding: 0.8rem !important; /* Reduced Padding for Compactness */
     transition: all 0.3s ease;
 }
-div[data-testid="stVerticalBlockBorderWrapper"]:hover {
-    border-color: #60a5fa !important; /* Hover par aur bright blue */
-    box-shadow: 0 4px 25px rgba(59, 130, 246, 0.3) !important; /* Blue shadow/glow */
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    border-color: #60a5fa !important;
+    box-shadow: 0 4px 25px rgba(59, 130, 246, 0.3) !important;
     transform: translateY(-2px);
 }
 
-/* Expander Overlap Fix */
+/* Expander Compactness & Overlap Fix */
 [data-testid="stExpander"] details {
     border: 1px solid rgba(148, 163, 184, 0.2) !important;
     border-radius: 6px !important;
     background-color: rgba(148, 163, 184, 0.02) !important;
 }
+[data-testid="stExpander"] summary {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+}
 [data-testid="stExpander"] summary p {
     font-weight: 700 !important;
-    font-size: 0.85rem !important;
+    font-size: 0.8rem !important;
 }
 
-/* Data Grid Layout */
+/* Data Grid Layout - More Compact */
 .data-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
-    gap: 8px;
+    gap: 6px;
     background-color: rgba(148, 163, 184, 0.05);
-    padding: 12px;
+    padding: 8px;
     border-radius: 6px;
     border: 1px solid rgba(148, 163, 184, 0.2);
-    margin: 12px 0;
+    margin: 8px 0;
 }
 .data-item {
     display: flex;
@@ -95,48 +100,43 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     color: var(--text-color);
     opacity: 0.6;
     font-weight: 600;
-    font-size: 0.65rem;
-    margin-bottom: 2px;
+    font-size: 0.6rem;
+    margin-bottom: 1px;
 }
 .data-value {
     font-weight: 700;
     color: var(--text-color);
-    font-size: 0.85rem;
-}
-
-/* Dynamic Live P&L Container Styling */
-.pnl-container {
-    display: flex;
-    flex-direction: column;
-}
-.pnl-value {
-    font-size: 1.25rem;
-    font-weight: 800;
-    margin-top: 4px;
+    font-size: 0.8rem;
 }
 
 /* Colors for specific values */
 .text-green { color: #10b981 !important; }
 .text-red { color: #ef4444 !important; }
 
-/* News Section */
+/* News Section - Compact */
 .news-section {
     background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%);
     border-left: 3px solid #3b82f6;
-    padding: 8px 10px;
+    padding: 6px 8px;
     border-radius: 4px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
     display: flex;
     align-items: center;
 }
 .news-icon {
-    font-size: 1.1rem;
-    margin-right: 10px;
+    font-size: 1rem;
+    margin-right: 8px;
 }
 .news-marquee {
     color: #60a5fa;
     font-weight: 600;
-    font-size: 0.8rem;
+    font-size: 0.75rem;
+}
+
+/* Streamlit Elements Padding Reduction */
+.stButton button {
+    padding: 2px 10px !important;
+    min-height: 0 !important;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -186,7 +186,7 @@ def get_live_news(company_name):
             return " &nbsp; ✦ &nbsp; ".join(headlines)
     except:
         pass
-    return f"Tracking latest technical updates and alerts for {company_name}..."
+    return f"Tracking latest updates for {company_name}..."
 
 # Core Data Connection
 SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
@@ -215,15 +215,15 @@ def draw_card(row):
         
         status = str(row.get('Status', 'IN TRADE')).strip().upper()
         
-        # BADGE LOGIC
+        # BADGE LOGIC (Smaller Fonts)
         if status == "TARGET HIT":
-            status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.7rem; background: rgba(16,185,129,0.1); padding: 3px 8px; border-radius: 4px;'>■ TARGET HIT</span>"
+            status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.6rem; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;'>■ TARGET HIT</span>"
         elif status == "SL HIT":
-            status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.7rem; background: rgba(239,68,68,0.1); padding: 3px 8px; border-radius: 4px;'>■ SL HIT</span>"
+            status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.6rem; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;'>■ SL HIT</span>"
         elif status == "WAITING":
-            status_html = "<span style='color: #f59e0b; font-weight: 800; font-size: 0.7rem; background: rgba(245,158,11,0.1); padding: 3px 8px; border-radius: 4px;'>⏳ PENDING</span>"
+            status_html = "<span style='color: #f59e0b; font-weight: 800; font-size: 0.6rem; background: rgba(245,158,11,0.1); padding: 2px 6px; border-radius: 4px;'>⏳ PENDING</span>"
         else:
-            status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.7rem; background: rgba(59,130,246,0.1); padding: 3px 8px; border-radius: 4px;'>■ ACTIVE</span>"
+            status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.6rem; background: rgba(59,130,246,0.1); padding: 2px 6px; border-radius: 4px;'>■ ACTIVE</span>"
 
         entry_date = str(row.get('Entry Date', '--')).split(' ')[0]
         if entry_date == 'nan': entry_date = '--'
@@ -232,7 +232,7 @@ def draw_card(row):
 
         date_str = f"ENTRY: {entry_date}"
         if status in ["TARGET HIT", "SL HIT"] and hit_date != '--':
-            date_str += f" &nbsp;|&nbsp; EXIT: {hit_date}"
+            date_str += f" | EXIT: {hit_date}"
 
         live_p_raw = row.get('Live Price', 0)
         entry_p_raw = row.get('Entry Price', 0)
@@ -282,18 +282,18 @@ def draw_card(row):
         # 1. VISIBLE COMPACT HEADER
         # ==========================================
         st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div style="font-weight: 900; font-size: 1.3rem; line-height: 1.1;">{clean_symbol}</div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="font-weight: 900; font-size: 1.15rem; line-height: 1;">{clean_symbol}</div>
             <div>{status_html}</div>
         </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(148, 163, 184, 0.05); padding: 10px; border-radius: 6px; margin-bottom: 5px; border: 1px solid rgba(148, 163, 184, 0.1);">
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(148, 163, 184, 0.05); padding: 6px 8px; border-radius: 6px; margin-bottom: 5px; border: 1px solid rgba(148, 163, 184, 0.1);">
             <div>
-                <div style="font-size: 0.65rem; opacity: 0.7; font-weight: 700;">TODAY'S CHG</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: {change_color};">{change_str}</div>
+                <div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700;">TODAY'S CHG</div>
+                <div style="font-size: 0.95rem; font-weight: 800; color: {change_color};">{change_str}</div>
             </div>
             <div style="text-align: right;">
-                <div style="font-size: 0.65rem; opacity: 0.7; font-weight: 700;">LIVE P&L</div>
-                <div style="font-size: 1.05rem;">{pnl_html}</div>
+                <div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700;">LIVE P&L</div>
+                <div style="font-size: 0.95rem;">{pnl_html}</div>
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -303,11 +303,15 @@ def draw_card(row):
         # ==========================================
         with st.expander("View Trade Details"):
             st.markdown(f"""
-            <div style="font-size: 0.85rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px;">{company_name}</div>
-            <div style="font-size: 0.7rem; opacity: 0.6; font-weight: 600; margin-bottom: 15px;">{date_str}</div>
-            """, unsafe_allow_html=True)
+            <div style="font-size: 0.8rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px;">{company_name}</div>
+            <div style="font-size: 0.65rem; opacity: 0.6; font-weight: 600; margin-bottom: 10px;">{date_str}</div>
             
-            st.metric(label="LIVE PRICE", value=f"₹{live_p_raw}")
+            <!-- Custom Compact Live Price instead of st.metric -->
+            <div style="margin-bottom: 10px;">
+                <div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700; text-transform: uppercase;">Live Price</div>
+                <div style="font-size: 1.3rem; font-weight: 800; color: var(--text-color); line-height: 1.1;">₹{live_p_raw}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
             tgt = row.get('Target Price', 0)
             sl = row.get('SL Level', 0)
@@ -393,20 +397,20 @@ if not df.empty:
     st.markdown("##### 🚀 Portfolio Snapshot")
     
     st.markdown(f"""
-    <div style="display: flex; gap: 15px; margin-bottom: 25px;">
-        <div style="flex: 1; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
-            <div style="font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Active Trades</div>
-            <div style="font-size: 1.8rem; font-weight: 900;">{total_active}</div>
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Active Trades</div>
+            <div style="font-size: 1.5rem; font-weight: 900;">{total_active}</div>
         </div>
-        <div style="flex: 1; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
-            <div style="font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Closed Trades</div>
-            <div style="font-size: 1.8rem; font-weight: 900;">{total_closed}</div>
+        <div style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Closed Trades</div>
+            <div style="font-size: 1.5rem; font-weight: 900;">{total_closed}</div>
         </div>
-        <div style="flex: 2; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center; display: flex; flex-direction: column; justify-content: center;">
-            <div style="font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 5px;">Cumulative P&L (Active)</div>
-            <div style="display: flex; justify-content: center; align-items: baseline; gap: 12px;">
-                <div style="font-size: 2rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
-                <div style="font-size: 0.9rem; font-weight: 700; color: {tc_color}; background: {tc_color}1A; padding: 3px 8px; border-radius: 4px;">{tc_sign}{today_change_pnl:.2f}% Today</div>
+        <div style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Cumulative P&L (Active)</div>
+            <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
+                <div style="font-size: 1.8rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
+                <div style="font-size: 0.8rem; font-weight: 700; color: {tc_color}; background: {tc_color}1A; padding: 2px 6px; border-radius: 4px;">{tc_sign}{today_change_pnl:.2f}% Today</div>
             </div>
         </div>
     </div>
