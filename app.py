@@ -222,13 +222,13 @@ def draw_card(row):
         
         # BADGE LOGIC
         if status == "TARGET HIT":
-            status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.7rem; background: rgba(16,185,129,0.1); padding: 3px 8px; border-radius: 4px;'>■ TARGET HIT</span>"
+            status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.8rem; background: rgba(16,185,129,0.1); padding: 3px 8px; border-radius: 4px;'>■ TARGET HIT</span>"
         elif status == "SL HIT":
-            status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.7rem; background: rgba(239,68,68,0.1); padding: 3px 8px; border-radius: 4px;'>■ SL HIT</span>"
+            status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.8rem; background: rgba(239,68,68,0.1); padding: 3px 8px; border-radius: 4px;'>■ SL HIT</span>"
         elif status == "WAITING":
-            status_html = "<span style='color: #f59e0b; font-weight: 800; font-size: 0.7rem; background: rgba(245,158,11,0.1); padding: 3px 8px; border-radius: 4px;'>⏳ PENDING</span>"
+            status_html = "<span style='color: #f59e0b; font-weight: 800; font-size: 0.8rem; background: rgba(245,158,11,0.1); padding: 3px 8px; border-radius: 4px;'>⏳ PENDING</span>"
         else:
-            status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.7rem; background: rgba(59,130,246,0.1); padding: 3px 8px; border-radius: 4px;'>■ ACTIVE</span>"
+            status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.8rem; background: rgba(59,130,246,0.1); padding: 3px 8px; border-radius: 4px;'>■ ACTIVE</span>"
 
         entry_date = str(row.get('Entry Date', '--')).split(' ')[0]
         if entry_date == 'nan': entry_date = '--'
@@ -239,10 +239,21 @@ def draw_card(row):
         if status in ["TARGET HIT", "SL HIT"] and hit_date != '--':
             date_str += f" &nbsp;|&nbsp; EXIT: {hit_date}"
 
+        # Header Module
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px;">
+            <div>
+                <div style="font-weight: 900; font-size: 1.3rem; line-height: 1.1;">{clean_symbol}</div>
+                <div style="font-size: 0.75rem; opacity: 0.7; max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">{company_name}</div>
+                <div style="font-size: 0.65rem; opacity: 0.5; font-weight: 600; margin-top: 4px;">{date_str}</div>
+            </div>
+            <div>{status_html}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
         live_p_raw = row.get('Live Price', 0)
         entry_p_raw = row.get('Entry Price', 0)
         
-        # --- TODAY'S CHANGE LOGIC ---
         yf_change = get_yahoo_change(raw_symbol)
         if yf_change:
             change_str = yf_change
@@ -258,51 +269,76 @@ def draw_card(row):
             except:
                 change_str = "0.00%"
 
-        change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
-
-        # --- LIVE P&L LOGIC ---
-        if status == "WAITING":
-            pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
-        else:
-            calculated_pnl = 0.0
-            if status == "IN TRADE":
-                try:
-                    e_val = float(str(entry_p_raw).replace(',', ''))
-                    l_val = float(str(live_p_raw).replace(',', ''))
-                    if e_val > 0 and l_val > 0:
-                        calculated_pnl = ((l_val - e_val) / e_val) * 100
-                except:
-                    pass
+        c1, c2 = st.columns(2)
+        with c1:
+            st.metric(label="LIVE PRICE", value=f"₹{live_p_raw}", delta=change_str)
+        with c2:
+            # 🚀 ON-THE-FLY DIRECT P&L CALCULATION LOGIC 🚀
+            if status == "WAITING":
+                pnl_html = '<span class="pnl-value" style="opacity: 0.5;">--</span>'
             else:
-                calculated_pnl = row.get('Live P&L %', 0)
+                calculated_pnl = 0.0
+                if status == "IN TRADE":
+                    try:
+                        e_val = float(str(entry_p_raw).replace(',', ''))
+                        l_val = float(str(live_p_raw).replace(',', ''))
+                        if e_val > 0 and l_val > 0:
+                            calculated_pnl = ((l_val - e_val) / e_val) * 100
+                    except:
+                        pass
+                else:
+                    # Fallback for closed trades if needed
+                    calculated_pnl = row.get('Live P&L %', 0)
 
-            if calculated_pnl > 0:
-                pnl_html = f'<span style="color: #10b981; font-weight: 800;">+{calculated_pnl:.2f}%</span>'
-            elif calculated_pnl < 0:
-                pnl_html = f'<span style="color: #ef4444; font-weight: 800;">{calculated_pnl:.2f}%</span>'
-            else:
-                pnl_html = f'<span style="font-weight: 800;">0.00%</span>'
-
-        # ==========================================
-        # 1. VISIBLE COMPACT HEADER (Yeh hamesha dikhega)
-        # ==========================================
-        st.markdown(f"""
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-            <div style="font-weight: 900; font-size: 1.3rem; line-height: 1.1;">{clean_symbol}</div>
-            <div>{status_html}</div>
-        </div>
-        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(148, 163, 184, 0.05); padding: 10px; border-radius: 6px; margin-bottom: 5px; border: 1px solid rgba(148, 163, 184, 0.1);">
-            <div>
-                <div style="font-size: 0.65rem; opacity: 0.7; font-weight: 700;">TODAY'S CHG</div>
-                <div style="font-size: 1.05rem; font-weight: 800; color: {change_color};">{change_str}</div>
+                pnl_html = get_pnl_html(calculated_pnl)
+                
+            st.markdown(f"""
+            <div class="pnl-container">
+                <div class="st-emotion-cache-1qmj432" style="font-size: 0.75rem; font-weight: 600; opacity: 0.7; text-transform: uppercase;">LIVE P&L</div>
+                {pnl_html}
             </div>
-            <div style="text-align: right;">
-                <div style="font-size: 0.65rem; opacity: 0.7; font-weight: 700;">LIVE P&L</div>
-                <div style="font-size: 1.05rem;">{pnl_html}</div>
+            """, unsafe_allow_html=True)
+
+        tgt = row.get('Target Price', 0)
+        sl = row.get('SL Level', 0)
+        
+        st.markdown(f"""
+        <div class="data-grid">
+            <div class="data-item">
+                <span class="data-label">ENTRY POINT</span>
+                <span class="data-value">₹{entry_p_raw}</span>
+            </div>
+            <div class="data-item">
+                <span class="data-label">TARGET</span>
+                <span class="data-value text-green">₹{tgt}</span>
+            </div>
+            <div class="data-item">
+                <span class="data-label">STOP LOSS</span>
+                <span class="data-value text-red">₹{sl}</span>
             </div>
         </div>
         """, unsafe_allow_html=True)
+        
+        latest_news = get_live_news(company_name)
+        st.markdown(f"""
+        <div class="news-section">
+            <span class="news-icon">📰</span> 
+            <marquee class="news-marquee" scrollamount="4" onmouseover="this.stop();" onmouseout="this.start();">
+                <a href="https://www.google.com/search?q={company_name.replace(' ', '+')}+stock+news&tbm=nws" target="_blank" style="color: inherit; text-decoration: none;">
+                    {latest_news}
+                </a>
+            </marquee>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        btn1, btn2 = st.columns(2)
+        with btn1:
+            st.link_button("DATA", f"https://www.screener.in/company/{clean_symbol}/", use_container_width=True)
+        with btn2:
+            st.link_button("CHART", f"https://in.tradingview.com/chart/?symbol={raw_symbol}", use_container_width=True)
 
+
+if not df.empty:
         # ==========================================
         # 2. EXPANDABLE DETAILS (Dropdown ke andar wala hissa)
         # ==========================================
