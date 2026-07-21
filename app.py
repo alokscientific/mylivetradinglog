@@ -1,10 +1,3 @@
-git hub
-
-
-
-
-
-
 import streamlit as st
 import pandas as pd
 import urllib.request
