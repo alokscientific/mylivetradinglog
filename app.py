@@ -61,18 +61,6 @@ div[data-testid="stVerticalBlockBorderWrapper"]:hover {
     transform: translateY(-2px);
 }
 
-/* Metric text adjustments */
-div[data-testid="stMetricValue"] {
-    font-size: 1.5rem !important; 
-    font-weight: 800 !important;
-}
-div[data-testid="stMetricLabel"] {
-    font-size: 0.85rem !important;
-    font-weight: 600 !important;
-    opacity: 0.7;
-    text-transform: uppercase;
-}
-
 /* Data Grid Layout */
 .data-grid {
     display: grid;
@@ -340,12 +328,16 @@ def draw_card(row):
 if not df.empty:
     
     # ==========================================
-    # 🚀 NEW ADDITION: PORTFOLIO SUMMARY DASHBOARD
+    # 🚀 PORTFOLIO SUMMARY DASHBOARD (FULLY CUSTOM)
     # ==========================================
     active_trades_df = df[df['Status'].isin(["IN TRADE"])]
-    total_active_trades = len(active_trades_df)
+    closed_trades_df = df[df['Status'].isin(["SL HIT", "TARGET HIT"])]
+    
+    total_active = len(active_trades_df)
+    total_closed = len(closed_trades_df)
 
-    def extract_raw_pnl(val_raw):
+    # Function to parse percentages securely
+    def extract_raw_val(val_raw):
         try:
             if pd.isna(val_raw): return 0.0
             val_str = str(val_raw).strip()
@@ -359,18 +351,39 @@ if not df.empty:
         except:
             return 0.0
 
-    # Calculate Total Cumulative P&L
-    cumulative_pnl = sum(active_trades_df['Live P&L %'].apply(extract_raw_pnl))
+    # Calculate Values
+    cumulative_pnl = sum(active_trades_df['Live P&L %'].apply(extract_raw_val))
+    today_change_pnl = sum(active_trades_df["Today's Change"].apply(extract_raw_val))
 
-    # Display Metrics at the top
+    # Determine Colors and Signs
+    pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
+    pnl_sign = "+" if cumulative_pnl > 0 else ""
+    
+    tc_color = "#10b981" if today_change_pnl > 0 else "#ef4444" if today_change_pnl < 0 else "inherit"
+    tc_sign = "+" if today_change_pnl > 0 else ""
+
     st.markdown("##### 🚀 Portfolio Snapshot")
-    sc1, sc2, sc3, sc4 = st.columns(4)
-    with sc1:
-        st.metric(label="TOTAL ACTIVE TRADES", value=total_active_trades)
-    with sc2:
-        st.metric(label="CUMULATIVE P&L", value=f"{cumulative_pnl:+.2f}%")
-        
-    st.divider()
+    
+    # Custom HTML Summary Cards
+    st.markdown(f"""
+    <div style="display: flex; gap: 15px; margin-bottom: 25px;">
+        <div style="flex: 1; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
+            <div style="font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Active Trades</div>
+            <div style="font-size: 1.8rem; font-weight: 900;">{total_active}</div>
+        </div>
+        <div style="flex: 1; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
+            <div style="font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Closed Trades</div>
+            <div style="font-size: 1.8rem; font-weight: 900;">{total_closed}</div>
+        </div>
+        <div style="flex: 2; padding: 15px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 0.75rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 5px;">Cumulative P&L (Active)</div>
+            <div style="display: flex; justify-content: center; align-items: baseline; gap: 12px;">
+                <div style="font-size: 2rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: {tc_color}; background: {tc_color}1A; padding: 3px 8px; border-radius: 4px;">{tc_sign}{today_change_pnl:.2f}% Today</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
     # ==========================================
 
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
@@ -381,49 +394,42 @@ if not df.empty:
             st.info("System currently idle. No active tracking.")
         else:
             cols = st.columns(4)
-            # FIX APPLIED HERE: Reset index so it doesn't skip grid spaces for hidden WAITING rows
             active_df = active_df.reset_index(drop=True)
             for index, row in active_df.iterrows():
                 with cols[index % 4]:
                     draw_card(row)
 
     with tab2:
-        history_df = df[df['Status'].isin(["SL HIT", "TARGET HIT"])]
-        if history_df.empty:
+        if closed_trades_df.empty:
             st.info("No closed logs found in the database.")
         else:
-            # Note: Humne 'Live P&L %' ko list se hata diya hai taaki hum khud locked P&L banayein
             display_columns = [
                 'Stock Symbol', 'Company Name', 'Entry Date', 
                 'Entry Price', 'Target Price', 'SL Level', 
                 'Hit Date', 'Status'
             ]
             
-            existing_cols = [col for col in display_columns if col in history_df.columns]
-            display_df = history_df[existing_cols].copy()
+            existing_cols = [col for col in display_columns if col in closed_trades_df.columns]
+            display_df = closed_trades_df[existing_cols].copy()
             
-            # 🔥 EXACT LOCKED P&L CALCULATION LOGIC 🔥
+            # EXACT LOCKED P&L CALCULATION LOGIC
             final_pnl_list = []
             for _, row in display_df.iterrows():
                 try:
                     entry = float(str(row['Entry Price']).replace(',', ''))
                     
-                    # Agar target hit hua toh Target price lo, warna SL price lo
                     if row['Status'] == 'TARGET HIT':
                         exit_price = float(str(row['Target Price']).replace(',', ''))
                     else:
                         exit_price = float(str(row['SL Level']).replace(',', ''))
                     
-                    # Exact Booked P&L Percentage calculation
                     pnl_pct = ((exit_price - entry) / entry) * 100
                     final_pnl_list.append(f"{pnl_pct:+.2f}%")
                 except:
                     final_pnl_list.append("--")
             
-            # Naya locked column dataframe me daal diya
             display_df['Trade P&L'] = final_pnl_list
             
-            # 'Trade P&L' column ko 'Status' se theek pehle shift karne ka code
             cols = display_df.columns.tolist()
             cols.insert(cols.index('Status'), cols.pop(cols.index('Trade P&L')))
             display_df = display_df[cols]
