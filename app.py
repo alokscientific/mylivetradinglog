@@ -433,7 +433,7 @@ if not df.empty:
                     draw_card(row)
 
     with tab2:
-        st.header("📜 Trade History")
+        st.header("Trade History")
         history_df = closed_trades_df.copy()
         
         if not history_df.empty:
