@@ -9,11 +9,22 @@ import time
 # Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
-/*  HIDE STREAMLIT DEFAULT TOP MENU & HEADER  */
+# Architectural & Dual-Theme (Light/Dark) Adaptive CSS
+st.markdown("""
+<style>
+/* 🚫 HIDE STREAMLIT DEFAULT TOP MENU & HEADER 🚫 */
 header {visibility: hidden !important;}
 #MainMenu {visibility: hidden !important;}
 footer {visibility: hidden !important;}
 [data-testid="stToolbar"] {visibility: hidden !important;}
+
+/* 🔥 FIXED FONT SETUP: Protects Streamlit Icons from Overlap 🔥 */
+html, body, p, span, div {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+/* ... baki ka purana CSS code ... */
+</style>
+""", unsafe_allow_html=True)
 
 # Architectural & Dual-Theme (Light/Dark) Adaptive CSS
 st.markdown("""
