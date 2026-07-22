@@ -49,15 +49,14 @@ html, body, p, span, div {
     margin-left: 24px;
 }
 
-/* 🔥 UPDATED: Card Design - Solid Blue Outline & Space Saver 🔥 */
-/* Removed 'div' selector to support Streamlit's new <fieldset> wrapper */
+/* Card Design - Solid Blue Outline & Space Saver */
 [data-testid="stVerticalBlockBorderWrapper"] {
-    border: 1.5px solid #3b82f6 !important; /* Solid Bright Blue */
-    border-top: 4px solid #2563eb !important; /* Thicker Top Blue Border */
+    border: 1.5px solid #3b82f6 !important;
+    border-top: 4px solid #2563eb !important; 
     border-radius: 8px !important;
     background-color: transparent !important;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
-    padding: 0.8rem !important; /* Reduced Padding for Compactness */
+    padding: 0.8rem !important; 
     transition: all 0.3s ease;
 }
 [data-testid="stVerticalBlockBorderWrapper"]:hover {
@@ -383,16 +382,8 @@ if not df.empty:
         except:
             pass
 
-    if "Today's Change" in active_trades_df.columns:
-        today_change_pnl = sum(active_trades_df["Today's Change"].apply(extract_raw_val))
-    else:
-        today_change_pnl = 0.0
-
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
     pnl_sign = "+" if cumulative_pnl > 0 else ""
-    
-    tc_color = "#10b981" if today_change_pnl > 0 else "#ef4444" if today_change_pnl < 0 else "inherit"
-    tc_sign = "+" if today_change_pnl > 0 else ""
 
     st.markdown("##### 🚀 Portfolio Snapshot")
     
@@ -410,7 +401,6 @@ if not df.empty:
             <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Cumulative P&L (Active)</div>
             <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
                 <div style="font-size: 1.8rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
-                <div style="font-size: 0.8rem; font-weight: 700; color: {tc_color}; background: {tc_color}1A; padding: 2px 6px; border-radius: 4px;">{tc_sign}{today_change_pnl:.2f}% Today</div>
             </div>
         </div>
     </div>
@@ -437,9 +427,6 @@ if not df.empty:
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
-            history_df['Days Held'] = (history_df['Hit Date'] - history_df['Entry Date']).dt.days
-            history_df['Days Held'] = history_df['Days Held'].fillna(0).astype(int)
-
             def clean_number(val):
                 if pd.isna(val) or val == 'None' or val == '':
                     return 0.0
@@ -458,19 +445,24 @@ if not df.empty:
             history_df['Entry Price Num'] = history_df['Entry Price'].apply(clean_number)
 
             total_cumulative_pnl = history_df['Trade P&L (%) Num'].sum()
-            total_cumulative_days = history_df['Days Held'].sum()
 
             st.markdown("### 📊 Overall Performance")
-            col1, col2 = st.columns(2)
-            with col1:
-                st.metric(label="Cumulative P&L", value=f"{total_cumulative_pnl:+.2f}%")
-            with col2:
-                st.metric(label="Cumulative Days in Trades", value=f"{total_cumulative_days} Days")
+            
+            # 🔥 Custom Styled Cumulative P&L (Smaller, Bold & Colored) 🔥
+            hist_color = "#10b981" if total_cumulative_pnl > 0 else "#ef4444" if total_cumulative_pnl < 0 else "inherit"
+            hist_sign = "+" if total_cumulative_pnl > 0 else ""
+            
+            st.markdown(f"""
+            <div style="margin-bottom: 15px;">
+                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Cumulative P&L</div>
+                <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}{total_cumulative_pnl:.2f}%</div>
+            </div>
+            """, unsafe_allow_html=True)
             
             st.divider()
 
             history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
-            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Days Held', 'Entry Price Num', 'Trade P&L (%)', 'Status']
+            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price Num', 'Trade P&L (%)', 'Status']
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
 
