@@ -305,7 +305,6 @@ def draw_card(row):
             <div style="font-size: 0.8rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px;">{company_name}</div>
             <div style="font-size: 0.65rem; opacity: 0.6; font-weight: 600; margin-bottom: 10px;">{date_str}</div>
             
-            <!-- Custom Compact Live Price instead of st.metric -->
             <div style="margin-bottom: 10px;">
                 <div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700; text-transform: uppercase;">Live Price</div>
                 <div style="font-size: 1.3rem; font-weight: 800; color: var(--text-color); line-height: 1.1;">₹{live_p_raw}</div>
@@ -357,33 +356,45 @@ if not df.empty:
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
 
-    def extract_raw_val(val_raw):
-        try:
-            if pd.isna(val_raw): return 0.0
-            val_str = str(val_raw).strip()
-            if '%' in val_str:
-                return float(val_str.replace('%', '').replace(',', ''))
-            else:
-                val = float(val_str.replace(',', ''))
-                if abs(val) < 1.0 and val != 0:
-                    return val * 100
-                return val
-        except:
-            return 0.0
-
+    # 🔥 SMART NET CHANGE LOGIC FOR TODAY 🔥
     cumulative_pnl = 0.0
+    yesterday_cumulative_pnl = 0.0
+
     for _, row in active_trades_df.iterrows():
         try:
             e_val = float(str(row.get('Entry Price', 0)).replace(',', ''))
             l_val = float(str(row.get('Live Price', 0)).replace(',', ''))
+            
+            # Extract Today's Change percentage to reverse-engineer yesterday's close
+            t_change_raw = str(row.get("Today's Change", "0")).strip()
+            t_change_val = 0.0
+            if '%' in t_change_raw:
+                t_change_val = float(t_change_raw.replace('%', '').replace(',', ''))
+            else:
+                t_change_val = float(t_change_raw.replace(',', ''))
+                if abs(t_change_val) < 1.0 and t_change_val != 0:
+                    t_change_val *= 100
+
             if e_val > 0 and l_val > 0:
+                # 1. Today's Cumulative P&L
                 trade_pnl_pct = ((l_val - e_val) / e_val) * 100
                 cumulative_pnl += trade_pnl_pct
+                
+                # 2. Yesterday's Cumulative P&L (calculated using prev close)
+                prev_close = l_val / (1 + (t_change_val / 100))
+                yesterday_pnl_pct = ((prev_close - e_val) / e_val) * 100
+                yesterday_cumulative_pnl += yesterday_pnl_pct
         except:
             pass
 
+    # The actual shift in Portfolio P&L today
+    today_net_change = cumulative_pnl - yesterday_cumulative_pnl
+
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
     pnl_sign = "+" if cumulative_pnl > 0 else ""
+    
+    tc_color = "#10b981" if today_net_change > 0 else "#ef4444" if today_net_change < 0 else "inherit"
+    tc_sign = "+" if today_net_change > 0 else ""
 
     st.markdown("##### 🚀 Portfolio Snapshot")
     
@@ -401,6 +412,8 @@ if not df.empty:
             <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Cumulative P&L (Active)</div>
             <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
                 <div style="font-size: 1.8rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
+                <!-- 🚀 Naya Logic Yahan Add Hua Hai 🚀 -->
+                <div style="font-size: 0.8rem; font-weight: 700; color: {tc_color}; background: {tc_color}1A; padding: 2px 6px; border-radius: 4px;">{tc_sign}{today_net_change:.2f}% Shift Today</div>
             </div>
         </div>
     </div>
@@ -448,7 +461,6 @@ if not df.empty:
 
             st.markdown("### 📊 Overall Performance")
             
-            # 🔥 Custom Styled Cumulative P&L (Smaller, Bold & Colored) 🔥
             hist_color = "#10b981" if total_cumulative_pnl > 0 else "#ef4444" if total_cumulative_pnl < 0 else "inherit"
             hist_sign = "+" if total_cumulative_pnl > 0 else ""
             
