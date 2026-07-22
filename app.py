@@ -9,6 +9,12 @@ import time
 # Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
+/* 🚫 HIDE STREAMLIT DEFAULT TOP MENU & HEADER 🚫 */
+header {visibility: hidden !important;}
+#MainMenu {visibility: hidden !important;}
+footer {visibility: hidden !important;}
+[data-testid="stToolbar"] {visibility: hidden !important;}
+
 # Architectural & Dual-Theme (Light/Dark) Adaptive CSS
 st.markdown("""
 <style>
