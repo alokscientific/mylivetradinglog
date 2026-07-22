@@ -419,7 +419,7 @@ if not df.empty:
     </div>
     """, unsafe_allow_html=True)
 
-    tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
+    tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "TRADE HISTORY"])
 
     with tab1:
         active_df = df[df['Status'].isin(["IN TRADE"])]
