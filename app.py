@@ -9,7 +9,7 @@ import time
 # Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
-# 🎨 ARCHITECTURAL & CLEAN UI CSS (All Fixes Merged)
+# 🎨 ARCHITECTURAL & CLEAN UI CSS
 st.markdown("""
 <style>
 /* 🚫 HIDE STREAMLIT DEFAULT TOP MENU & HEADER 🚫 */
@@ -163,6 +163,19 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.divider()
 
+# 🔥 BULLETPROOF NaN FILTER FUNCTION 🔥
+def safe_float(val, default=0.0):
+    """Converts strings, nan, and empty cells to a safe float safely."""
+    if pd.isna(val): 
+        return default
+    val_str = str(val).strip().lower()
+    if val_str in ['nan', 'none', '', 'inf', '-inf'] or '#n/a' in val_str or 'loading' in val_str:
+        return default
+    try:
+        return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
+    except:
+        return default
+
 # Live Real-Time Change from Yahoo Finance
 @st.cache_data(ttl=60)
 def get_yahoo_change(symbol):
@@ -219,7 +232,7 @@ def load_data():
     except Exception as e:
         return pd.DataFrame()
 
-@st.cache_data(ttl=60) # Caches history for 60 seconds
+@st.cache_data(ttl=60)
 def load_historical_data():
     try:
         hist_data = pd.read_csv(HIST_CSV_URL)
@@ -251,16 +264,17 @@ def draw_card(row):
             status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.6rem; background: rgba(59,130,246,0.1); padding: 2px 6px; border-radius: 4px;'>■ ACTIVE</span>"
 
         entry_date = str(row.get('Entry Date', '--')).split(' ')[0]
-        if entry_date == 'nan': entry_date = '--'
+        if entry_date.lower() == 'nan': entry_date = '--'
         hit_date = str(row.get('Hit Date', '--')).split(' ')[0]
-        if hit_date == 'nan': hit_date = '--'
+        if hit_date.lower() == 'nan': hit_date = '--'
 
         date_str = f"ENTRY: {entry_date}"
         if status in ["TARGET HIT", "SL HIT"] and hit_date != '--':
             date_str += f" | EXIT: {hit_date}"
 
-        live_p_raw = row.get('Live Price', 0)
-        entry_p_raw = row.get('Entry Price', 0)
+        # SAFE FETCH FOR UI
+        live_p_val = safe_float(row.get('Live Price', 0))
+        entry_p_val = safe_float(row.get('Entry Price', 0))
         
         # TODAY'S CHANGE LOGIC
         yf_change = get_yahoo_change(raw_symbol)
@@ -268,15 +282,11 @@ def draw_card(row):
             change_str = yf_change
         else:
             t_change_raw = str(row.get("Today's Change", "0")).strip()
-            try:
-                if '%' in t_change_raw:
-                    val = float(t_change_raw.replace('%', '').replace(',', ''))
-                    change_str = f"{val:+.2f}%"
-                else:
-                    val = float(t_change_raw.replace(',', ''))
-                    change_str = f"{val * 100:+.2f}%" if abs(val) < 1.0 and val != 0 else f"{val:+.2f}%"
-            except:
-                change_str = "0.00%"
+            val = safe_float(t_change_raw)
+            if '%' not in t_change_raw and abs(val) < 1.0 and val != 0:
+                change_str = f"{val * 100:+.2f}%"
+            else:
+                change_str = f"{val:+.2f}%"
 
         change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
 
@@ -286,15 +296,10 @@ def draw_card(row):
         else:
             calculated_pnl = 0.0
             if status == "IN TRADE":
-                try:
-                    e_val = float(str(entry_p_raw).replace(',', ''))
-                    l_val = float(str(live_p_raw).replace(',', ''))
-                    if e_val > 0 and l_val > 0:
-                        calculated_pnl = ((l_val - e_val) / e_val) * 100
-                except:
-                    pass
+                if entry_p_val > 0 and live_p_val > 0:
+                    calculated_pnl = ((live_p_val - entry_p_val) / entry_p_val) * 100
             else:
-                calculated_pnl = row.get('Live P&L %', 0)
+                calculated_pnl = safe_float(row.get('Live P&L %', 0))
 
             if calculated_pnl > 0:
                 pnl_html = f'<span style="color: #10b981; font-weight: 800;">+{calculated_pnl:.2f}%</span>'
@@ -327,18 +332,19 @@ def draw_card(row):
             
             <div style="margin-bottom: 10px;">
                 <div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700; text-transform: uppercase;">Live Price</div>
-                <div style="font-size: 1.3rem; font-weight: 800; color: var(--text-color); line-height: 1.1;">₹{live_p_raw}</div>
+                <div style="font-size: 1.3rem; font-weight: 800; color: var(--text-color); line-height: 1.1;">₹{live_p_val}</div>
             </div>
             """, unsafe_allow_html=True)
 
-            tgt = row.get('Target Price', 0)
-            sl = row.get('SL Level', 0)
+            # Convert to standard formats or '0'
+            tgt = safe_float(row.get('Target Price', 0))
+            sl = safe_float(row.get('SL Level', 0))
             
             st.markdown(f"""
             <div class="data-grid">
                 <div class="data-item">
                     <span class="data-label">ENTRY POINT</span>
-                    <span class="data-value">₹{entry_p_raw}</span>
+                    <span class="data-value">₹{entry_p_val}</span>
                 </div>
                 <div class="data-item">
                     <span class="data-label">TARGET</span>
@@ -379,14 +385,12 @@ if not df.empty:
     # 🔥 CALCULATION 1: TODAY'S CURRENT LIVE P&L
     cumulative_pnl = 0.0
     for _, row in active_trades_df.iterrows():
-        try:
-            e_val = float(str(row.get('Entry Price', 0)).replace(',', ''))
-            l_val = float(str(row.get('Live Price', 0)).replace(',', ''))
-            if e_val > 0 and l_val > 0:
-                trade_pnl_pct = ((l_val - e_val) / e_val) * 100
-                cumulative_pnl += trade_pnl_pct
-        except:
-            pass
+        e_val = safe_float(row.get('Entry Price', 0))
+        l_val = safe_float(row.get('Live Price', 0))
+        
+        if e_val > 0 and l_val > 0:
+            trade_pnl_pct = ((l_val - e_val) / e_val) * 100
+            cumulative_pnl += trade_pnl_pct
 
     # 🔥 CALCULATION 2: YESTERDAY'S P&L FROM HISTORICAL_DB
     yesterday_cumulative_pnl = 0.0
@@ -395,17 +399,14 @@ if not df.empty:
         latest_records = hist_df[hist_df['Date'] == latest_date]
         
         for val in latest_records['P&L %']:
-            try:
-                val_str = str(val).replace(',', '').strip()
-                if '%' in val_str:
-                    num = float(val_str.replace('%', ''))
-                else:
-                    num = float(val_str)
-                    if abs(num) < 1.0 and num != 0:
-                        num = num * 100
-                yesterday_cumulative_pnl += num
-            except:
-                pass
+            num = safe_float(val)
+            val_str = str(val).strip()
+            
+            # Agar format 0.05 jaisa ho bina % sign ke, toh usko 5% mein convert karna zaroori hai
+            if '%' not in val_str and abs(num) < 1.0 and num != 0:
+                num = num * 100
+                
+            yesterday_cumulative_pnl += num
 
     # 🔥 CALCULATION 3: ACTUAL SHIFT TODAY
     today_net_change = cumulative_pnl - yesterday_cumulative_pnl
@@ -459,22 +460,17 @@ if not df.empty:
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
-            def clean_number(val):
-                if pd.isna(val) or val == 'None' or val == '':
-                    return 0.0
-                return float(str(val).replace('%', '').replace('+', '').replace(',', '').strip())
-
             def calculate_closed_pnl(row):
                 status = str(row.get('Status', '')).strip().upper()
                 if status == 'TARGET HIT':
-                    return clean_number(row.get('Target %', 0))
+                    return safe_float(row.get('Target %', 0))
                 elif status == 'SL HIT':
-                    return -abs(clean_number(row.get('SL %', 0)))
+                    return -abs(safe_float(row.get('SL %', 0)))
                 else:
                     return 0.0
 
             history_df['Trade P&L (%) Num'] = history_df.apply(calculate_closed_pnl, axis=1)
-            history_df['Entry Price Num'] = history_df['Entry Price'].apply(clean_number)
+            history_df['Entry Price Num'] = history_df['Entry Price'].apply(lambda x: safe_float(x))
 
             total_cumulative_pnl = history_df['Trade P&L (%) Num'].sum()
 
@@ -518,7 +514,7 @@ if not df.empty:
                 "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Entry Price": "{:.2f}",  
-                "Trade P&L (%)": lambda x: f"{clean_number(x):+.2f}%" 
+                "Trade P&L (%)": lambda x: f"{safe_float(x):+.2f}%" 
             }
 
             styled_history_df = display_df.style.map(color_status, subset=['Status']) \
