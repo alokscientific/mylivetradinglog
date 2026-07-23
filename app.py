@@ -9,7 +9,7 @@ import time
 # Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
-# Architectural & Dual-Theme (Light/Dark) Adaptive CSS
+# 🎨 ARCHITECTURAL & CLEAN UI CSS (All Fixes Merged)
 st.markdown("""
 <style>
 /* 🚫 HIDE STREAMLIT DEFAULT TOP MENU & HEADER 🚫 */
@@ -18,22 +18,20 @@ header {visibility: hidden !important;}
 footer {visibility: hidden !important;}
 [data-testid="stToolbar"] {visibility: hidden !important;}
 
-/* 🔥 FIXED FONT SETUP: Protects Streamlit Icons from Overlap 🔥 */
-html, body, p, span, div {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+/* 🚫 HIDE STREAMLIT FLOATING BADGES / FEEDBACK BUTTONS ON MOBILE 🚫 */
+[data-testid="stDecoration"] {display: none !important;}
+[data-testid="stStatusWidget"] {visibility: hidden !important; display: none !important;}
+#streamlit-root > div:last-child {display: none !important;}
+.stAppDeployButton {display: none !important; visibility: hidden !important;}
+div[class*="streamlit-badge"], iframe[title="Streamlit"], footer + div {
+    display: none !important;
+    visibility: hidden !important;
 }
-/* ... baki ka purana CSS code ... */
-</style>
-""", unsafe_allow_html=True)
 
-# Architectural & Dual-Theme (Light/Dark) Adaptive CSS
-st.markdown("""
-<style>
 /* 🔥 FIXED FONT SETUP: Protects Streamlit Icons from Overlap 🔥 */
 html, body, p, span, div {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
-/* Force Material Icons to retain their original font so they don't show text ligatures */
 .stIconMaterial, [data-testid="stIconMaterial"], .material-symbols-rounded {
     font-family: 'Material Symbols Rounded' !important;
 }
@@ -82,7 +80,7 @@ html, body, p, span, div {
     transform: translateY(-2px);
 }
 
-/* Expander Compactness & Overlap Fix */
+/* Expander Compactness */
 [data-testid="stExpander"] details {
     border: 1px solid rgba(148, 163, 184, 0.2) !important;
     border-radius: 6px !important;
@@ -97,7 +95,7 @@ html, body, p, span, div {
     font-size: 0.8rem !important;
 }
 
-/* Data Grid Layout - More Compact */
+/* Data Grid Layout */
 .data-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
@@ -125,11 +123,10 @@ html, body, p, span, div {
     font-size: 0.8rem;
 }
 
-/* Colors for specific values */
 .text-green { color: #10b981 !important; }
 .text-red { color: #ef4444 !important; }
 
-/* News Section - Compact */
+/* News Section */
 .news-section {
     background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%);
     border-left: 3px solid #3b82f6;
@@ -204,23 +201,35 @@ def get_live_news(company_name):
         pass
     return f"Tracking latest updates for {company_name}..."
 
-# Core Data Connection
+# Core Data Connection (Main Sheet & Historical_DB)
 SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
-GID = "1424037063"
-SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
+MAIN_GID = "1424037063"
+HIST_GID = "1761067592"
+
+MAIN_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={MAIN_GID}"
+HIST_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={HIST_GID}"
 
 @st.cache_data(ttl=5)
 def load_data():
     try:
-        data = pd.read_csv(SHEET_CSV_URL)
+        data = pd.read_csv(MAIN_CSV_URL)
         data.columns = [str(c).strip() for c in data.columns]
         data = data.dropna(subset=['Stock Symbol'])
         return data
     except Exception as e:
-        st.error(f"Error fetching data: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=60) # Caches history for 60 seconds
+def load_historical_data():
+    try:
+        hist_data = pd.read_csv(HIST_CSV_URL)
+        hist_data.columns = [str(c).strip() for c in hist_data.columns]
+        return hist_data
+    except Exception as e:
         return pd.DataFrame()
 
 df = load_data()
+hist_df = load_historical_data()
 
 # 🔥 COMPACT CARD DESIGN WITH CLEAN EXPANDER 🔥
 def draw_card(row):
@@ -231,7 +240,7 @@ def draw_card(row):
         
         status = str(row.get('Status', 'IN TRADE')).strip().upper()
         
-        # BADGE LOGIC (Smaller Fonts)
+        # BADGE LOGIC
         if status == "TARGET HIT":
             status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.6rem; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;'>■ TARGET HIT</span>"
         elif status == "SL HIT":
@@ -253,7 +262,7 @@ def draw_card(row):
         live_p_raw = row.get('Live Price', 0)
         entry_p_raw = row.get('Entry Price', 0)
         
-        # --- TODAY'S CHANGE LOGIC ---
+        # TODAY'S CHANGE LOGIC
         yf_change = get_yahoo_change(raw_symbol)
         if yf_change:
             change_str = yf_change
@@ -271,7 +280,7 @@ def draw_card(row):
 
         change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
 
-        # --- LIVE P&L LOGIC ---
+        # LIVE P&L LOGIC
         if status == "WAITING":
             pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
         else:
@@ -294,9 +303,6 @@ def draw_card(row):
             else:
                 pnl_html = f'<span style="font-weight: 800;">0.00%</span>'
 
-        # ==========================================
-        # 1. VISIBLE COMPACT HEADER
-        # ==========================================
         st.markdown(f"""
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
             <div style="font-weight: 900; font-size: 1.15rem; line-height: 1;">{clean_symbol}</div>
@@ -314,9 +320,6 @@ def draw_card(row):
         </div>
         """, unsafe_allow_html=True)
 
-        # ==========================================
-        # 2. EXPANDABLE DETAILS
-        # ==========================================
         with st.expander("View Trade Details"):
             st.markdown(f"""
             <div style="font-size: 0.8rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px;">{company_name}</div>
@@ -373,38 +376,38 @@ if not df.empty:
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
 
-    # 🔥 SMART NET CHANGE LOGIC FOR TODAY 🔥
+    # 🔥 CALCULATION 1: TODAY'S CURRENT LIVE P&L
     cumulative_pnl = 0.0
-    yesterday_cumulative_pnl = 0.0
-
     for _, row in active_trades_df.iterrows():
         try:
             e_val = float(str(row.get('Entry Price', 0)).replace(',', ''))
             l_val = float(str(row.get('Live Price', 0)).replace(',', ''))
-            
-            # Extract Today's Change percentage to reverse-engineer yesterday's close
-            t_change_raw = str(row.get("Today's Change", "0")).strip()
-            t_change_val = 0.0
-            if '%' in t_change_raw:
-                t_change_val = float(t_change_raw.replace('%', '').replace(',', ''))
-            else:
-                t_change_val = float(t_change_raw.replace(',', ''))
-                if abs(t_change_val) < 1.0 and t_change_val != 0:
-                    t_change_val *= 100
-
             if e_val > 0 and l_val > 0:
-                # 1. Today's Cumulative P&L
                 trade_pnl_pct = ((l_val - e_val) / e_val) * 100
                 cumulative_pnl += trade_pnl_pct
-                
-                # 2. Yesterday's Cumulative P&L (calculated using prev close)
-                prev_close = l_val / (1 + (t_change_val / 100))
-                yesterday_pnl_pct = ((prev_close - e_val) / e_val) * 100
-                yesterday_cumulative_pnl += yesterday_pnl_pct
         except:
             pass
 
-    # The actual shift in Portfolio P&L today
+    # 🔥 CALCULATION 2: YESTERDAY'S P&L FROM HISTORICAL_DB
+    yesterday_cumulative_pnl = 0.0
+    if not hist_df.empty and 'Date' in hist_df.columns and 'P&L %' in hist_df.columns:
+        latest_date = hist_df['Date'].iloc[-1]
+        latest_records = hist_df[hist_df['Date'] == latest_date]
+        
+        for val in latest_records['P&L %']:
+            try:
+                val_str = str(val).replace(',', '').strip()
+                if '%' in val_str:
+                    num = float(val_str.replace('%', ''))
+                else:
+                    num = float(val_str)
+                    if abs(num) < 1.0 and num != 0:
+                        num = num * 100
+                yesterday_cumulative_pnl += num
+            except:
+                pass
+
+    # 🔥 CALCULATION 3: ACTUAL SHIFT TODAY
     today_net_change = cumulative_pnl - yesterday_cumulative_pnl
 
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
@@ -429,14 +432,13 @@ if not df.empty:
             <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Cumulative P&L (Active)</div>
             <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
                 <div style="font-size: 1.8rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
-                <!-- 🚀 Naya Logic Yahan Add Hua Hai 🚀 -->
                 <div style="font-size: 0.8rem; font-weight: 700; color: {tc_color}; background: {tc_color}1A; padding: 2px 6px; border-radius: 4px;">{tc_sign}{today_net_change:.2f}% Shift Today</div>
             </div>
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "TRADE HISTORY"])
+    tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
     with tab1:
         active_df = df[df['Status'].isin(["IN TRADE"])]
@@ -450,7 +452,7 @@ if not df.empty:
                     draw_card(row)
 
     with tab2:
-        st.header("Trade History")
+        st.header("📜 Trade History")
         history_df = closed_trades_df.copy()
         
         if not history_df.empty:
@@ -494,7 +496,6 @@ if not df.empty:
             columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price Num', 'Trade P&L (%)', 'Status']
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
-
             display_df = display_df.rename(columns={'Entry Price Num': 'Entry Price'})
 
             def color_status(val):
