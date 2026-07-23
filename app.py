@@ -446,7 +446,7 @@ if not df.empty:
             
             st.markdown(f"""
             <div style="margin-bottom: 15px;">
-                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Cumulative P&L</div>
+                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed trade cumulative P&L</div>
                 <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}{total_cumulative_pnl:.2f}%</div>
             </div>
             """, unsafe_allow_html=True)
