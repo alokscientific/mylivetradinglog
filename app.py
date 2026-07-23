@@ -214,13 +214,11 @@ def get_live_news(company_name):
         pass
     return f"Tracking latest updates for {company_name}..."
 
-# Core Data Connection (Main Sheet & Historical_DB)
+# Core Data Connection (Main Sheet Only)
 SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
 MAIN_GID = "1424037063"
-HIST_GID = "1761067592"
 
 MAIN_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={MAIN_GID}"
-HIST_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={HIST_GID}"
 
 @st.cache_data(ttl=5)
 def load_data():
@@ -232,17 +230,7 @@ def load_data():
     except Exception as e:
         return pd.DataFrame()
 
-@st.cache_data(ttl=60)
-def load_historical_data():
-    try:
-        hist_data = pd.read_csv(HIST_CSV_URL)
-        hist_data.columns = [str(c).strip() for c in hist_data.columns]
-        return hist_data
-    except Exception as e:
-        return pd.DataFrame()
-
 df = load_data()
-hist_df = load_historical_data()
 
 # 🔥 COMPACT CARD DESIGN WITH CLEAN EXPANDER 🔥
 def draw_card(row):
@@ -392,31 +380,9 @@ if not df.empty:
             trade_pnl_pct = ((l_val - e_val) / e_val) * 100
             cumulative_pnl += trade_pnl_pct
 
-    # 🔥 CALCULATION 2: YESTERDAY'S P&L FROM HISTORICAL_DB
-    yesterday_cumulative_pnl = 0.0
-    if not hist_df.empty and 'Date' in hist_df.columns and 'P&L %' in hist_df.columns:
-        latest_date = hist_df['Date'].iloc[-1]
-        latest_records = hist_df[hist_df['Date'] == latest_date]
-        
-        for val in latest_records['P&L %']:
-            num = safe_float(val)
-            val_str = str(val).strip()
-            
-            # Agar format 0.05 jaisa ho bina % sign ke, toh usko 5% mein convert karna zaroori hai
-            if '%' not in val_str and abs(num) < 1.0 and num != 0:
-                num = num * 100
-                
-            yesterday_cumulative_pnl += num
-
-    # 🔥 CALCULATION 3: ACTUAL SHIFT TODAY
-    today_net_change = cumulative_pnl - yesterday_cumulative_pnl
-
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
     pnl_sign = "+" if cumulative_pnl > 0 else ""
     
-    tc_color = "#10b981" if today_net_change > 0 else "#ef4444" if today_net_change < 0 else "inherit"
-    tc_sign = "+" if today_net_change > 0 else ""
-
     st.markdown("##### 🚀 Portfolio Snapshot")
     
     st.markdown(f"""
@@ -433,7 +399,6 @@ if not df.empty:
             <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Cumulative P&L (Active)</div>
             <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
                 <div style="font-size: 1.8rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
-                <div style="font-size: 0.8rem; font-weight: 700; color: {tc_color}; background: {tc_color}1A; padding: 2px 6px; border-radius: 4px;">{tc_sign}{today_net_change:.2f}% Shift Today</div>
             </div>
         </div>
     </div>
