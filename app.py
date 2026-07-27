@@ -163,18 +163,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.divider()
 
-# 🔥 BULLETPROOF NaN FILTER FUNCTION 🔥
-def safe_float(val, default=0.0):
-    """Converts strings, nan, and empty cells to a safe float safely."""
-    if pd.isna(val): 
-        return default
-    val_str = str(val).strip().lower()
-    if val_str in ['nan', 'none', '', 'inf', '-inf'] or '#n/a' in val_str or 'loading' in val_str:
-        return default
-    try:
-        return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
-    except:
-        return default
+# ⚠️ SEBI Disclaimer Ticker (Naya Code Yahan Add Kiya Hai)
+st.markdown("""
+<div style="background-color: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 6px 12px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid rgba(245, 158, 11, 0.2);">
+    <span style="font-size: 1.1rem; margin-right: 10px;">⚠️</span>
+    <marquee scrollamount="5" onmouseover="this.stop();" onmouseout="this.start();" style="color: #d97706; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px;">
+        DISCLAIMER: I am not a SEBI registered advisor. This is my personal vlog / trade log and is strictly for educational purposes only. 
+    </marquee>
+</div>
+""", unsafe_allow_html=True)
+
+# Live Real-Time Change from Yahoo Finance (Ye purana code yahan se continue hoga...)
+@st.cache_data(ttl=60)
+def get_yahoo_change(symbol):
+# ... baki ka code same rahega ...
 
 # Live Real-Time Change from Yahoo Finance
 @st.cache_data(ttl=60)
