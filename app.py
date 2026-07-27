@@ -428,7 +428,7 @@ if not df.empty:
                     draw_card(row)
 
     with tab2:
-        st.header("📜 Trade History")
+        st.header("Trade History")
         history_df = closed_trades_df.copy()
         
         if not history_df.empty:
@@ -449,14 +449,14 @@ if not df.empty:
 
             total_cumulative_pnl = history_df['Trade P&L (%) Num'].sum()
 
-            st.markdown("### 📊 Overall Performance")
+            st.markdown("")
             
             hist_color = "#10b981" if total_cumulative_pnl > 0 else "#ef4444" if total_cumulative_pnl < 0 else "inherit"
             hist_sign = "+" if total_cumulative_pnl > 0 else ""
             
             st.markdown(f"""
             <div style="margin-bottom: 15px;">
-                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Cumulative P&L</div>
+                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumlative P&L</div>
                 <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}{total_cumulative_pnl:.2f}%</div>
             </div>
             """, unsafe_allow_html=True)
