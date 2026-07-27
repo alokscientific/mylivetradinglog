@@ -393,7 +393,7 @@ if not df.empty:
     pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
     pnl_sign = "+" if cumulative_pnl > 0 else ""
     
-    st.markdown("##### 🚀 Portfolio Snapshot")
+    st.markdown("##### 📈 Portfolio Snapshot")
     
     st.markdown(f"""
     <div style="display: flex; gap: 10px; margin-bottom: 20px;">
