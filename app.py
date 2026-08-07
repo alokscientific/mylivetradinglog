@@ -6,6 +6,9 @@ import xml.etree.ElementTree as ET
 import yfinance as yf
 import time
 
+# --- CONSTANT INVESTMENT AMOUNT ---
+INVESTMENT_PER_TRADE = 100000  # Rs 1 Lakh per stock
+
 # Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
@@ -132,7 +135,6 @@ def draw_card(row):
         company_name = str(row.get('Company Name', '--'))
         status = str(row.get('Status', 'IN TRADE')).strip().upper()
         
-        # 🚀 NEW BADGES ADDED 🚀
         if status == "TARGET HIT": status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.6rem; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;'>■ TARGET HIT</span>"
         elif status == "SL HIT": status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.6rem; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;'>■ SL HIT</span>"
         elif status == "TRAIL EXIT": status_html = "<span style='color: #8b5cf6; font-weight: 800; font-size: 0.6rem; background: rgba(139,92,246,0.1); padding: 2px 6px; border-radius: 4px;'>🛡️ TRAIL EXIT</span>"
@@ -161,17 +163,23 @@ def draw_card(row):
 
         change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
 
+        # 🔥 Rs 1 LAKH P&L CALCULATION 🔥
         if status == "WAITING": pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
         else:
-            calculated_pnl = 0.0
+            calculated_pnl_pct = 0.0
             if status == "IN TRADE":
-                if entry_p_val > 0 and live_p_val > 0: calculated_pnl = ((live_p_val - entry_p_val) / entry_p_val) * 100
+                if entry_p_val > 0 and live_p_val > 0: calculated_pnl_pct = ((live_p_val - entry_p_val) / entry_p_val) * 100
             else:
-                calculated_pnl = safe_float(row.get('Live P&L %', 0))
+                calculated_pnl_pct = safe_float(row.get('Live P&L %', 0))
 
-            if calculated_pnl > 0: pnl_html = f'<span style="color: #10b981; font-weight: 800;">+{calculated_pnl:.2f}%</span>'
-            elif calculated_pnl < 0: pnl_html = f'<span style="color: #ef4444; font-weight: 800;">{calculated_pnl:.2f}%</span>'
-            else: pnl_html = f'<span style="font-weight: 800;">0.00%</span>'
+            calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
+
+            if calculated_pnl_amount > 0: 
+                pnl_html = f'<span style="color: #10b981; font-weight: 800;">+₹{calculated_pnl_amount:,.0f} <span style="font-size:0.6rem; opacity:0.8;">(+{calculated_pnl_pct:.2f}%)</span></span>'
+            elif calculated_pnl_amount < 0: 
+                pnl_html = f'<span style="color: #ef4444; font-weight: 800;">-₹{abs(calculated_pnl_amount):,.0f} <span style="font-size:0.6rem; opacity:0.8;">({calculated_pnl_pct:.2f}%)</span></span>'
+            else: 
+                pnl_html = f'<span style="font-weight: 800;">₹0 <span style="font-size:0.6rem; opacity:0.8;">(0.00%)</span></span>'
 
         st.markdown(f"""
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
@@ -180,7 +188,7 @@ def draw_card(row):
         </div>
         <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(148, 163, 184, 0.05); padding: 6px 8px; border-radius: 6px; margin-bottom: 5px; border: 1px solid rgba(148, 163, 184, 0.1);">
             <div><div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700;">TODAY'S CHG</div><div style="font-size: 0.95rem; font-weight: 800; color: {change_color};">{change_str}</div></div>
-            <div style="text-align: right;"><div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700;">LIVE P&L</div><div style="font-size: 0.95rem;">{pnl_html}</div></div>
+            <div style="text-align: right;"><div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700;">LIVE P&L (₹1L)</div><div style="font-size: 0.95rem;">{pnl_html}</div></div>
         </div>
         """, unsafe_allow_html=True)
 
@@ -218,36 +226,41 @@ def draw_card(row):
 
 if not df.empty:
     active_trades_df = df[df['Status'].isin(["IN TRADE"])]
-    # 🚀 History Tab ab Trailed aur Replaced ko bhi uthayega
     closed_trades_df = df[df['Status'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
     
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
 
-    cumulative_pnl = 0.0
+    cumulative_pnl_pct = 0.0
+    cumulative_pnl_amount = 0.0
+    
     for _, row in active_trades_df.iterrows():
         e_val = safe_float(row.get('Entry Price', 0))
         l_val = safe_float(row.get('Live Price', 0))
-        if e_val > 0 and l_val > 0: cumulative_pnl += ((l_val - e_val) / e_val) * 100
+        if e_val > 0 and l_val > 0: 
+            trade_pct = ((l_val - e_val) / e_val) * 100
+            cumulative_pnl_pct += trade_pct
+            cumulative_pnl_amount += (trade_pct / 100) * INVESTMENT_PER_TRADE
 
-    pnl_color = "#10b981" if cumulative_pnl > 0 else "#ef4444" if cumulative_pnl < 0 else "inherit"
-    pnl_sign = "+" if cumulative_pnl > 0 else ""
+    pnl_color = "#10b981" if cumulative_pnl_amount > 0 else "#ef4444" if cumulative_pnl_amount < 0 else "inherit"
+    pnl_sign = "+" if cumulative_pnl_amount > 0 else ""
     
     st.markdown("##### 📈 Portfolio Snapshot")
     st.markdown(f"""
     <div style="display: flex; gap: 10px; margin-bottom: 20px;">
         <div style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
-            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Active Trades</div>
-            <div style="font-size: 1.5rem; font-weight: 900;">{total_active}</div>
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Total Invested</div>
+            <div style="font-size: 1.2rem; font-weight: 900;">₹{total_active} Lakh</div>
         </div>
         <div style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
-            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Closed Trades</div>
-            <div style="font-size: 1.5rem; font-weight: 900;">{total_closed}</div>
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Active / Closed</div>
+            <div style="font-size: 1.2rem; font-weight: 900;">{total_active} / {total_closed}</div>
         </div>
         <div style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center; display: flex; flex-direction: column; justify-content: center;">
-            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Cumulative P&L (Active)</div>
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Current Live P&L (Active)</div>
             <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
-                <div style="font-size: 1.8rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}{cumulative_pnl:.2f}%</div>
+                <div style="font-size: 1.6rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}₹{cumulative_pnl_amount:,.0f}</div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: {pnl_color};">({pnl_sign}{cumulative_pnl_pct:.2f}%)</div>
             </div>
         </div>
     </div>
@@ -272,8 +285,6 @@ if not df.empty:
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
-            # 🚀 EXACT EXIT P&L CALCULATOR 🚀
-            # Exit hone ke baad Live Price waise bhi ruk jata hai backend se, toh ye sabse accurate hai
             def calculate_closed_pnl(row):
                 e_val = safe_float(row.get('Entry Price', 0))
                 l_val = safe_float(row.get('Live Price', 0))
@@ -282,22 +293,29 @@ if not df.empty:
 
             history_df['Trade P&L (%) Num'] = history_df.apply(calculate_closed_pnl, axis=1)
             history_df['Entry Price Num'] = history_df['Entry Price'].apply(lambda x: safe_float(x))
+            
+            # Rs 1 Lakh Calculation for History
+            history_df['Trade P&L (₹)'] = (history_df['Trade P&L (%) Num'] / 100) * INVESTMENT_PER_TRADE
 
-            total_cumulative_pnl = history_df['Trade P&L (%) Num'].sum()
+            total_cumulative_pnl_pct = history_df['Trade P&L (%) Num'].sum()
+            total_cumulative_pnl_amount = history_df['Trade P&L (₹)'].sum()
 
-            hist_color = "#10b981" if total_cumulative_pnl > 0 else "#ef4444" if total_cumulative_pnl < 0 else "inherit"
-            hist_sign = "+" if total_cumulative_pnl > 0 else ""
+            hist_color = "#10b981" if total_cumulative_pnl_amount > 0 else "#ef4444" if total_cumulative_pnl_amount < 0 else "inherit"
+            hist_sign = "+" if total_cumulative_pnl_amount > 0 else ""
             
             st.markdown(f"""
             <div style="margin-bottom: 15px;">
-                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L</div>
-                <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}{total_cumulative_pnl:.2f}%</div>
+                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L (Realized)</div>
+                <div style="display: flex; align-items: baseline; gap: 8px;">
+                    <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}₹{total_cumulative_pnl_amount:,.0f}</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: {hist_color};">({hist_sign}{total_cumulative_pnl_pct:.2f}%)</div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
             st.divider()
 
             history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
-            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price Num', 'Trade P&L (%)', 'Status']
+            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price Num', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status']
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
             display_df = display_df.rename(columns={'Entry Price Num': 'Entry Price'})
@@ -320,11 +338,12 @@ if not df.empty:
                 "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Entry Price": "{:.2f}",  
+                "Trade P&L (₹)": lambda x: f"₹{safe_float(x):+,.0f}",
                 "Trade P&L (%)": lambda x: f"{safe_float(x):+.2f}%" 
             }
 
             styled_history_df = display_df.style.map(color_status, subset=['Status']) \
-                                                .map(color_pnl, subset=['Trade P&L (%)']) \
+                                                .map(color_pnl, subset=['Trade P&L (₹)', 'Trade P&L (%)']) \
                                                 .format(format_dict)
 
             st.dataframe(styled_history_df, use_container_width=True, hide_index=True)
