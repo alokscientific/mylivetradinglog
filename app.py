@@ -163,7 +163,7 @@ def draw_card(row):
 
         change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
 
-        # 🔥 Rs 1 LAKH P&L CALCULATION 🔥
+        # 🔥 Rs 1 LAKH P&L CALCULATION FOR CARDS 🔥
         if status == "WAITING": pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
         else:
             calculated_pnl_pct = 0.0
@@ -231,7 +231,6 @@ if not df.empty:
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
 
-    cumulative_pnl_pct = 0.0
     cumulative_pnl_amount = 0.0
     
     for _, row in active_trades_df.iterrows():
@@ -239,8 +238,14 @@ if not df.empty:
         l_val = safe_float(row.get('Live Price', 0))
         if e_val > 0 and l_val > 0: 
             trade_pct = ((l_val - e_val) / e_val) * 100
-            cumulative_pnl_pct += trade_pct
             cumulative_pnl_amount += (trade_pct / 100) * INVESTMENT_PER_TRADE
+
+    # 🚀 ACCURATE PERCENTAGE FIX 🚀
+    total_invested_amount = total_active * INVESTMENT_PER_TRADE
+    if total_invested_amount > 0:
+        cumulative_pnl_pct = (cumulative_pnl_amount / total_invested_amount) * 100
+    else:
+        cumulative_pnl_pct = 0.0
 
     pnl_color = "#10b981" if cumulative_pnl_amount > 0 else "#ef4444" if cumulative_pnl_amount < 0 else "inherit"
     pnl_sign = "+" if cumulative_pnl_amount > 0 else ""
@@ -297,8 +302,14 @@ if not df.empty:
             # Rs 1 Lakh Calculation for History
             history_df['Trade P&L (₹)'] = (history_df['Trade P&L (%) Num'] / 100) * INVESTMENT_PER_TRADE
 
-            total_cumulative_pnl_pct = history_df['Trade P&L (%) Num'].sum()
             total_cumulative_pnl_amount = history_df['Trade P&L (₹)'].sum()
+            
+            # 🚀 ACCURATE HISTORICAL PERCENTAGE FIX 🚀
+            total_historical_invested = total_closed * INVESTMENT_PER_TRADE
+            if total_historical_invested > 0:
+                total_cumulative_pnl_pct = (total_cumulative_pnl_amount / total_historical_invested) * 100
+            else:
+                total_cumulative_pnl_pct = 0.0
 
             hist_color = "#10b981" if total_cumulative_pnl_amount > 0 else "#ef4444" if total_cumulative_pnl_amount < 0 else "inherit"
             hist_sign = "+" if total_cumulative_pnl_amount > 0 else ""
