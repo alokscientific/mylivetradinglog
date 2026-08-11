@@ -6,13 +6,12 @@ import xml.etree.ElementTree as ET
 import yfinance as yf
 import time
 
-# --- CONSTANT INVESTMENT AMOUNT ---
+# --- CONSTANT INVESTMENT SETTINGS ---
 INVESTMENT_PER_TRADE = 100000  # Rs 1 Lakh per stock
+TOTAL_PORTFOLIO_CAPITAL = 1000000 # Fixed Rs 10 Lakh for Realized P&L % calculation
 
-# Page config
 st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
-# 🎨 ARCHITECTURAL & CLEAN UI CSS
 st.markdown("""
 <style>
 header {visibility: hidden !important;}
@@ -56,6 +55,7 @@ html, body, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFo
 .data-value { font-weight: 700; color: var(--text-color); font-size: 0.8rem; }
 .text-green { color: #10b981 !important; }
 .text-red { color: #ef4444 !important; }
+.text-purple { color: #8b5cf6 !important; }
 .news-section { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%); border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; }
 .news-icon { font-size: 1rem; margin-right: 8px; }
 .news-marquee { color: #60a5fa; font-weight: 600; font-size: 0.75rem; }
@@ -71,7 +71,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.divider()
 
-# ⚠️ SEBI Disclaimer Ticker
 st.markdown("""
 <div style="background-color: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 6px 12px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid rgba(245, 158, 11, 0.2);">
     <span style="font-size: 1.1rem; margin-right: 10px;">⚠️</span>
@@ -163,7 +162,6 @@ def draw_card(row):
 
         change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
 
-        # 🔥 Rs 1 LAKH P&L CALCULATION FOR CARDS 🔥
         if status == "WAITING": pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
         else:
             calculated_pnl_pct = 0.0
@@ -200,13 +198,19 @@ def draw_card(row):
             """, unsafe_allow_html=True)
 
             tgt = safe_float(row.get('Target Price', 0))
-            sl = safe_float(row.get('SL Level', 0))
+            orig_sl = safe_float(row.get('SL Level', 0))
+            trailed_sl = safe_float(row.get('Trailed SL', 0))
             
+            if trailed_sl > orig_sl:
+                sl_display_html = f'<span class="data-value text-purple">₹{trailed_sl} <span style="font-size: 0.55rem;">(TRAILED)</span></span>'
+            else:
+                sl_display_html = f'<span class="data-value text-red">₹{orig_sl}</span>'
+
             st.markdown(f"""
             <div class="data-grid">
                 <div class="data-item"><span class="data-label">ENTRY POINT</span><span class="data-value">₹{entry_p_val}</span></div>
                 <div class="data-item"><span class="data-label">TARGET</span><span class="data-value text-green">₹{tgt}</span></div>
-                <div class="data-item"><span class="data-label">STOP LOSS</span><span class="data-value text-red">₹{sl}</span></div>
+                <div class="data-item"><span class="data-label">STOP LOSS</span>{sl_display_html}</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -240,12 +244,8 @@ if not df.empty:
             trade_pct = ((l_val - e_val) / e_val) * 100
             cumulative_pnl_amount += (trade_pct / 100) * INVESTMENT_PER_TRADE
 
-    # 🚀 ACCURATE PERCENTAGE FIX 🚀
     total_invested_amount = total_active * INVESTMENT_PER_TRADE
-    if total_invested_amount > 0:
-        cumulative_pnl_pct = (cumulative_pnl_amount / total_invested_amount) * 100
-    else:
-        cumulative_pnl_pct = 0.0
+    cumulative_pnl_pct = (cumulative_pnl_amount / total_invested_amount) * 100 if total_invested_amount > 0 else 0.0
 
     pnl_color = "#10b981" if cumulative_pnl_amount > 0 else "#ef4444" if cumulative_pnl_amount < 0 else "inherit"
     pnl_sign = "+" if cumulative_pnl_amount > 0 else ""
@@ -298,25 +298,19 @@ if not df.empty:
 
             history_df['Trade P&L (%) Num'] = history_df.apply(calculate_closed_pnl, axis=1)
             history_df['Entry Price Num'] = history_df['Entry Price'].apply(lambda x: safe_float(x))
-            
-            # Rs 1 Lakh Calculation for History
             history_df['Trade P&L (₹)'] = (history_df['Trade P&L (%) Num'] / 100) * INVESTMENT_PER_TRADE
 
             total_cumulative_pnl_amount = history_df['Trade P&L (₹)'].sum()
             
-            # 🚀 ACCURATE HISTORICAL PERCENTAGE FIX 🚀
-            total_historical_invested = total_closed * INVESTMENT_PER_TRADE
-            if total_historical_invested > 0:
-                total_cumulative_pnl_pct = (total_cumulative_pnl_amount / total_historical_invested) * 100
-            else:
-                total_cumulative_pnl_pct = 0.0
+            # --- UPDATED: FIXED PORTFOLIO PERCENTAGE CALCULATION ---
+            total_cumulative_pnl_pct = (total_cumulative_pnl_amount / TOTAL_PORTFOLIO_CAPITAL) * 100
 
             hist_color = "#10b981" if total_cumulative_pnl_amount > 0 else "#ef4444" if total_cumulative_pnl_amount < 0 else "inherit"
             hist_sign = "+" if total_cumulative_pnl_amount > 0 else ""
             
             st.markdown(f"""
             <div style="margin-bottom: 15px;">
-                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L (Realized)</div>
+                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L (Realized on ₹10L Capital)</div>
                 <div style="display: flex; align-items: baseline; gap: 8px;">
                     <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}₹{total_cumulative_pnl_amount:,.0f}</div>
                     <div style="font-size: 1rem; font-weight: 700; color: {hist_color};">({hist_sign}{total_cumulative_pnl_pct:.2f}%)</div>
@@ -326,10 +320,15 @@ if not df.empty:
             st.divider()
 
             history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
-            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price Num', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status']
+            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status']
+            
+            # Handle possible duplicate column names and clean up
+            if 'Entry Price' in history_df.columns and 'Entry Price Num' in history_df.columns:
+                history_df = history_df.drop('Entry Price', axis=1)
+            history_df = history_df.rename(columns={'Entry Price Num': 'Entry Price'})
+
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
-            display_df = display_df.rename(columns={'Entry Price Num': 'Entry Price'})
 
             def color_status(val):
                 val_str = str(val).strip().upper()
