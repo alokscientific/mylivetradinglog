@@ -124,7 +124,7 @@ def load_data():
         data.columns = [str(c).strip() for c in data.columns]
         data = data.dropna(subset=['Stock Symbol'])
         
-        # Clean status column for safe filtering
+        # Safe Status Cleaning
         if 'Status' in data.columns:
             data['Status_Clean'] = data['Status'].astype(str).str.strip().str.upper()
         else:
@@ -159,7 +159,7 @@ def draw_card(row):
 
         entry_p_val = safe_float(row.get('Entry Price', 0))
         
-        # LOCKED MATH FOR CLOSED TRADES
+        # 🔥 LOCKED MATH FOR CLOSED TRADES 🔥
         if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"]:
             if status == "TARGET HIT": exit_p_val = safe_float(row.get('Target Price', 0))
             elif status == "SL HIT": exit_p_val = safe_float(row.get('SL Level', 0))
@@ -179,7 +179,6 @@ def draw_card(row):
             price_title = "Exit Price"
         
         else:
-            # ACTIVE TRADES MATH
             display_price = safe_float(row.get('Live Price', 0))
             price_title = "Live Price"
             pnl_title = "LIVE P&L (₹1L)"
@@ -194,15 +193,11 @@ def draw_card(row):
 
             change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
 
-            if status == "WAITING": 
-                calculated_pnl_amount = 0
-                calculated_pnl_pct = 0.0
+            if entry_p_val > 0 and display_price > 0: 
+                calculated_pnl_pct = ((display_price - entry_p_val) / entry_p_val) * 100
             else:
-                if entry_p_val > 0 and display_price > 0: 
-                    calculated_pnl_pct = ((display_price - entry_p_val) / entry_p_val) * 100
-                else:
-                    calculated_pnl_pct = safe_float(row.get('Live P&L %', 0))
-                calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
+                calculated_pnl_pct = safe_float(row.get('Live P&L %', 0))
+            calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
 
         if status == "WAITING": 
             pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
@@ -269,7 +264,6 @@ if not df.empty:
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
 
-    # ACTIVE TRADES CUMULATIVE CALCULATION
     cumulative_active_amount = 0.0
     for _, row in active_trades_df.iterrows():
         e_val = safe_float(row.get('Entry Price', 0))
@@ -308,13 +302,11 @@ if not df.empty:
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
     with tab1:
-        # 🚀 KEWAL 'IN TRADE' (ACTIVE) STOCKS YAHAN DIKHENGE 🚀
-        active_df = df[df['Status_Clean'].isin(["IN TRADE"])]
-        if active_df.empty: st.info("System currently idle. No active tracking.")
+        if active_trades_df.empty: st.info("System currently idle. No active tracking.")
         else:
             cols = st.columns(4)
-            active_df = active_df.reset_index(drop=True)
-            for index, row in active_df.iterrows():
+            active_trades_df = active_trades_df.reset_index(drop=True)
+            for index, row in active_trades_df.iterrows():
                 with cols[index % 4]: draw_card(row)
 
     with tab2:
@@ -327,7 +319,7 @@ if not df.empty:
 
             def calculate_closed_pnl(row):
                 e_val = safe_float(row.get('Entry Price', 0))
-                status = str(row.get('Status', '')).strip().upper()
+                status = str(row.get('Status_Clean', '')).strip().upper()
                 
                 exit_p = 0.0
                 if status == "TARGET HIT": exit_p = safe_float(row.get('Target Price', 0))
