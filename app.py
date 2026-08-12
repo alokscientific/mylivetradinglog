@@ -122,7 +122,15 @@ def load_data():
     try:
         data = pd.read_csv(MAIN_CSV_URL)
         data.columns = [str(c).strip() for c in data.columns]
-        return data.dropna(subset=['Stock Symbol'])
+        data = data.dropna(subset=['Stock Symbol'])
+        
+        # Clean status column for safe filtering
+        if 'Status' in data.columns:
+            data['Status_Clean'] = data['Status'].astype(str).str.strip().str.upper()
+        else:
+            data['Status_Clean'] = "IN TRADE"
+            
+        return data
     except Exception as e: return pd.DataFrame()
 
 df = load_data()
@@ -132,7 +140,7 @@ def draw_card(row):
         raw_symbol = str(row['Stock Symbol']).strip()
         clean_symbol = raw_symbol.split(':')[-1] if ':' in raw_symbol else raw_symbol
         company_name = str(row.get('Company Name', '--'))
-        status = str(row.get('Status', 'IN TRADE')).strip().upper()
+        status = row.get('Status_Clean', 'IN TRADE')
         
         if status == "TARGET HIT": status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.6rem; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;'>■ TARGET HIT</span>"
         elif status == "SL HIT": status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.6rem; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;'>■ SL HIT</span>"
@@ -151,12 +159,12 @@ def draw_card(row):
 
         entry_p_val = safe_float(row.get('Entry Price', 0))
         
-        # 🔥 UI FIX: CLOSED TRADES KA MATH LOCK KAR DIYA 🔥
+        # LOCKED MATH FOR CLOSED TRADES
         if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"]:
             if status == "TARGET HIT": exit_p_val = safe_float(row.get('Target Price', 0))
             elif status == "SL HIT": exit_p_val = safe_float(row.get('SL Level', 0))
             elif status == "TRAIL EXIT": exit_p_val = safe_float(row.get('Trailed SL', 0))
-            else: exit_p_val = safe_float(row.get('Live Price', 0)) # fallback for replaced
+            else: exit_p_val = safe_float(row.get('Live Price', 0)) 
 
             if entry_p_val > 0 and exit_p_val > 0:
                 calculated_pnl_pct = ((exit_p_val - entry_p_val) / entry_p_val) * 100
@@ -171,7 +179,7 @@ def draw_card(row):
             price_title = "Exit Price"
         
         else:
-            # ACTIVE TRADES LOGIC
+            # ACTIVE TRADES MATH
             display_price = safe_float(row.get('Live Price', 0))
             price_title = "Live Price"
             pnl_title = "LIVE P&L (₹1L)"
@@ -196,7 +204,6 @@ def draw_card(row):
                     calculated_pnl_pct = safe_float(row.get('Live P&L %', 0))
                 calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
 
-        # HTML Formatting for P&L
         if status == "WAITING": 
             pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
         elif calculated_pnl_amount > 0: 
@@ -256,8 +263,8 @@ def draw_card(row):
             with btn2: st.link_button("CHART", f"https://in.tradingview.com/chart/?symbol={raw_symbol}", use_container_width=True)
 
 if not df.empty:
-    active_trades_df = df[df['Status'].isin(["IN TRADE"])]
-    closed_trades_df = df[df['Status'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
+    active_trades_df = df[df['Status_Clean'].isin(["IN TRADE"])]
+    closed_trades_df = df[df['Status_Clean'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
     
     total_active = len(active_trades_df)
     total_closed = len(closed_trades_df)
@@ -301,7 +308,8 @@ if not df.empty:
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
     with tab1:
-        active_df = df[df['Status'].isin(["IN TRADE", "WAITING"])]
+        # 🚀 KEWAL 'IN TRADE' (ACTIVE) STOCKS YAHAN DIKHENGE 🚀
+        active_df = df[df['Status_Clean'].isin(["IN TRADE"])]
         if active_df.empty: st.info("System currently idle. No active tracking.")
         else:
             cols = st.columns(4)
@@ -317,7 +325,6 @@ if not df.empty:
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
-            # 🔥 SMART P&L LOGIC FOR CLOSED TRADES (LOCKED) 🔥
             def calculate_closed_pnl(row):
                 e_val = safe_float(row.get('Entry Price', 0))
                 status = str(row.get('Status', '')).strip().upper()
