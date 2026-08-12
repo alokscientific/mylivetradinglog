@@ -25,14 +25,8 @@ def load_data():
     try:
         data = pd.read_csv(SHEET_CSV_URL)
         data.columns = [str(c).strip() for c in data.columns]
+        # Khali rows ko hata denge
         data = data.dropna(subset=['Stock Symbol'])
-        
-        # 🚀 BUG FIX 1: Status column ko clean kar diya taaki filtering me galti na ho
-        if 'Status' in data.columns:
-            data['Status_Clean'] = data['Status'].astype(str).str.strip().str.upper()
-        else:
-            data['Status_Clean'] = "IN TRADE"
-            
         return data
     except Exception as e:
         st.error(f"Google Sheet se connect karne me dikkat aayi: {e}")
@@ -50,7 +44,7 @@ def format_pct(val):
 
 def safe_float(val):
     try:
-        if pd.isna(val) or str(val).strip() in ["", "#VALUE!", "--"]: return 0.0
+        if pd.isna(val) or str(val).strip() in ["", "#VALUE!"]: return 0.0
         return float(str(val).replace('%', '').replace(',', ''))
     except:
         return 0.0
@@ -61,42 +55,25 @@ def draw_card(row):
         raw_symbol = str(row['Stock Symbol']).strip()
         clean_symbol = raw_symbol.split(':')[-1] if ':' in raw_symbol else raw_symbol
         company_name = str(row.get('Company Name', '--'))
-        status = row.get('Status_Clean', 'IN TRADE')
-        
+
         st.markdown(f"#### 🏷️ {raw_symbol}")
         st.caption(f"{company_name}")
         st.divider() 
 
         c1, c2, c3 = st.columns(3)
         with c1:
-            entry_p = safe_float(row.get('Entry Price', 0))
-            st.metric(label="Entry Price", value=f"₹{entry_p}")
+            st.metric(label="Entry Price", value=f"₹{row.get('Entry Price', 0)}")
         with c2:
-            # 🚀 BUG FIX 2: Agar trade close ho chuki hai, toh Live Price ki jagah Exit Price dikhayenge
-            if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT"]:
-                exit_val = 0.0
-                if status == "TARGET HIT": exit_val = safe_float(row.get('Target Price', 0))
-                elif status == "SL HIT": exit_val = safe_float(row.get('SL Level', 0))
-                elif status == "TRAIL EXIT": exit_val = safe_float(row.get('Trailed SL', 0))
-                st.metric(label="Exit Price", value=f"₹{exit_val}")
-            else:
-                live_p = row.get('Live Price', 0)
-                if pd.isna(live_p) or str(live_p).strip() in ["", "#VALUE!"]: live_p = "--"
-                st.metric(label="Live Price", value=f"₹{live_p}")
-                
+            # Handle Blank/Error cells safely
+            live_p = row.get('Live Price', 0)
+            if pd.isna(live_p) or str(live_p).strip() in ["", "#VALUE!"]:
+                live_p = "--"
+            st.metric(label="Live Price", value=f"₹{live_p}")
         with c3:
-            # 🚀 BUG FIX 3: Closed trades ka fix P&L dikhayenge, Live sheet ka fluctuating nahi
-            if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT"]:
-                if entry_p > 0 and exit_val > 0:
-                    pct = (exit_val - entry_p) / entry_p
-                    pnl_val = f"{pct*100:+.2f}%"
-                else:
-                    pnl_val = "0.00%"
-                st.metric(label="Realized P&L", value=pnl_val)
-            else:
-                pnl_val = format_pct(row.get('Live P&L %', 0))
-                st.metric(label="Live P&L", value=pnl_val)
+            pnl_val = format_pct(row.get('Live P&L %', 0))
+            st.metric(label="Live P&L", value=pnl_val)
 
+        status = str(row.get('Status', 'IN TRADE')).strip().upper()
         if status == "TARGET HIT":
             st.success("🎯 TARGET HIT")
         elif status == "SL HIT":
@@ -117,20 +94,22 @@ def draw_card(row):
 
 
 if not df.empty:
-    # --- 10 LAKH PORTFOLIO P&L CALCULATION (STRICTLY FIXED) ---
-    closed_trades = df[df['Status_Clean'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
+    
+    # --- 10 LAKH PORTFOLIO P&L CALCULATION (FIXED HISTORY) ---
+    closed_trades = df[df['Status'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
     total_realized_pnl = 0.0
     
     for _, row in closed_trades.iterrows():
         entry = safe_float(row.get('Entry Price', 0))
-        status = row['Status_Clean']
+        status = str(row.get('Status', '')).strip().upper()
         
-        # 🚀 BUG FIX 4: Exact calculation. Live Price ka fallback hamesha ke liye hata diya!
+        # Exact calculation using fixed exit levels (Live price ignore karega)
         exit_p = 0.0
         if status == "TARGET HIT": exit_p = safe_float(row.get('Target Price', 0))
         elif status == "SL HIT": exit_p = safe_float(row.get('SL Level', 0))
         elif status == "TRAIL EXIT": exit_p = safe_float(row.get('Trailed SL', 0))
-        # REPLACED trades ka old exit data sheet me save nahi hota, isliye unko math calculation me safely ignore (0 P&L) rakhenge taaki math fix rahe.
+        
+        if exit_p == 0: exit_p = safe_float(row.get('Live Price', 0))
         
         if entry > 0 and exit_p > 0:
             pct_gain = (exit_p - entry) / entry
@@ -148,7 +127,7 @@ if not df.empty:
     tab1, tab2 = st.tabs(["📊 Active Trades", "📜 Closed Trades History"])
 
     with tab1:
-        active_df = df[df['Status_Clean'].isin(["IN TRADE", "WAITING"])]
+        active_df = df[df['Status'].isin(["IN TRADE", "WAITING"])]
         if active_df.empty:
             st.info("Abhi koi active trade nahi hai.")
         else:
