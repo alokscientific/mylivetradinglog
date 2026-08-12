@@ -1,151 +1,398 @@
 import streamlit as st
 import pandas as pd
+import urllib.request
+import urllib.parse
+import xml.etree.ElementTree as ET
+import yfinance as yf
+import time
 
-# Page layout aur config set kar rahe hain
-st.set_page_config(page_title="LBA ALGO Track System", page_icon="📈", layout="wide")
+# --- CONSTANT INVESTMENT SETTINGS ---
+INVESTMENT_PER_TRADE = 100000  # Rs 1 Lakh per stock
+TOTAL_PORTFOLIO_CAPITAL = 1000000 # Fixed Rs 10 Lakh for Realized P&L % calculation
 
-# Dashboard ka Title aur Subtitle
-st.title("LBA ALGO Track System")
-st.write("**Automated Execution & Faceless Trading Dashboard**")
+st.set_page_config(page_title="TRADE LOG SYSTEM", page_icon="📈", layout="wide")
 
-# SEBI Disclaimer Box
-st.info("Disclaimer: EDUCATIONAL PURPOSES ONLY. I am NOT a SEBI Registered Analyst. This dashboard strictly tracks personal algorithmic logic. Do not consider this as buy/sell advice.")
+st.markdown("""
+<style>
+header {visibility: hidden !important;}
+#MainMenu {visibility: hidden !important;}
+footer {visibility: hidden !important;}
+[data-testid="stToolbar"] {visibility: hidden !important;}
+[data-testid="stDecoration"] {display: none !important;}
+[data-testid="stStatusWidget"] {visibility: hidden !important; display: none !important;}
+#streamlit-root > div:last-child {display: none !important;}
+.stAppDeployButton {display: none !important; visibility: hidden !important;}
+div[class*="streamlit-badge"], iframe[title="Streamlit"], footer + div {
+    display: none !important; visibility: hidden !important;
+}
 
-# Aapki Google Sheet ka Live CSV Export URL (ID aur GID ke sath)
+html, body, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+.stIconMaterial, [data-testid="stIconMaterial"], .material-symbols-rounded { font-family: 'Material Symbols Rounded' !important; }
+
+.header-container { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px; }
+.main-title {
+    background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+    color: white; padding: 8px 20px; border-radius: 8px; font-weight: 900;
+    font-size: 1.6rem; letter-spacing: 1.5px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); margin-bottom: 4px; display: inline-block;
+}
+.sub-title { color: var(--text-color); opacity: 0.7; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px; margin-left: 24px; }
+
+[data-testid="stVerticalBlockBorderWrapper"] {
+    border: 1.5px solid #3b82f6 !important; border-top: 4px solid #2563eb !important; 
+    border-radius: 8px !important; background-color: transparent !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important; padding: 0.8rem !important; transition: all 0.3s ease;
+}
+[data-testid="stVerticalBlockBorderWrapper"]:hover {
+    border-color: #60a5fa !important; box-shadow: 0 4px 25px rgba(59, 130, 246, 0.3) !important; transform: translateY(-2px);
+}
+[data-testid="stExpander"] details { border: 1px solid rgba(148, 163, 184, 0.2) !important; border-radius: 6px !important; background-color: rgba(148, 163, 184, 0.02) !important; }
+[data-testid="stExpander"] summary { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+[data-testid="stExpander"] summary p { font-weight: 700 !important; font-size: 0.8rem !important; }
+
+.data-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; background-color: rgba(148, 163, 184, 0.05); padding: 8px; border-radius: 6px; border: 1px solid rgba(148, 163, 184, 0.2); margin: 8px 0; }
+.data-item { display: flex; flex-direction: column; }
+.data-label { color: var(--text-color); opacity: 0.6; font-weight: 600; font-size: 0.6rem; margin-bottom: 1px; }
+.data-value { font-weight: 700; color: var(--text-color); font-size: 0.8rem; }
+.text-green { color: #10b981 !important; }
+.text-red { color: #ef4444 !important; }
+.text-purple { color: #8b5cf6 !important; }
+.news-section { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%); border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; }
+.news-icon { font-size: 1rem; margin-right: 8px; }
+.news-marquee { color: #60a5fa; font-weight: 600; font-size: 0.75rem; }
+.stButton button { padding: 2px 10px !important; min-height: 0 !important; }
+</style>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="header-container">
+    <div class="main-title">TRADE LOG SYSTEM</div>
+    <div class="sub-title">Track & Trade Terminal</div>
+</div>
+""", unsafe_allow_html=True)
+st.divider()
+
+st.markdown("""
+<div style="background-color: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 6px 12px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid rgba(245, 158, 11, 0.2);">
+    <span style="font-size: 1.1rem; margin-right: 10px;">⚠️</span>
+    <marquee scrollamount="5" onmouseover="this.stop();" onmouseout="this.start();" style="color: #d97706; font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px;">
+        DISCLAIMER: I am not a SEBI registered advisor. This is my personal vlog / trade log and is strictly for educational purposes only. 
+    </marquee>
+</div>
+""", unsafe_allow_html=True)
+
+def safe_float(val, default=0.0):
+    if pd.isna(val): return default
+    val_str = str(val).strip().lower()
+    if val_str in ['nan', 'none', '', 'inf', '-inf'] or '#n/a' in val_str or 'loading' in val_str: return default
+    try: return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
+    except: return default
+
+@st.cache_data(ttl=60)
+def get_yahoo_change(symbol):
+    try:
+        yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
+        if "BSE:" in symbol: yf_sym = symbol.replace("BSE:", "") + ".BO"
+        tkr = yf.Ticker(yf_sym)
+        prev = tkr.fast_info['previous_close']
+        curr = tkr.fast_info['last_price']
+        if prev and prev > 0: return f"{((curr - prev) / prev) * 100:+.2f}%"
+    except: pass
+    return None
+
+@st.cache_data(ttl=1800)
+def get_live_news(company_name):
+    try:
+        clean_name = company_name.split()[0]
+        query = urllib.parse.quote(f"{clean_name} stock news India")
+        url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        response = urllib.request.urlopen(req, timeout=3)
+        root = ET.fromstring(response.read())
+        headlines = [item.find('title').text for item in root.findall('.//item')[:2]]
+        if headlines: return " &nbsp; ✦ &nbsp; ".join(headlines)
+    except: pass
+    return f"Tracking latest updates for {company_name}..."
+
 SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
-GID = "1424037063"
-SHEET_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
+MAIN_GID = "1424037063"
+MAIN_CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={MAIN_GID}"
 
-# --- INVESTMENT CONSTANTS ---
-TOTAL_PORTFOLIO_CAPITAL = 1000000  # 10 Lakh base capital
-INVESTMENT_PER_TRADE = 100000      # 1 Lakh per trade
-
-@st.cache_data(ttl=30)  # Har 30 second me data auto-refresh hoga
+@st.cache_data(ttl=5)
 def load_data():
     try:
-        data = pd.read_csv(SHEET_CSV_URL)
+        data = pd.read_csv(MAIN_CSV_URL)
         data.columns = [str(c).strip() for c in data.columns]
-        # Khali rows ko hata denge
-        data = data.dropna(subset=['Stock Symbol'])
-        return data
-    except Exception as e:
-        st.error(f"Google Sheet se connect karne me dikkat aayi: {e}")
-        return pd.DataFrame()
+        return data.dropna(subset=['Stock Symbol'])
+    except Exception as e: return pd.DataFrame()
 
 df = load_data()
 
-def format_pct(val):
-    try:
-        if pd.isna(val) or str(val).strip() in ["", "#VALUE!"]: return "0.00%"
-        if isinstance(val, str) and '%' in val: return val
-        return f"{float(val)*100:.2f}%"
-    except:
-        return "0.00%"
-
-def safe_float(val):
-    try:
-        if pd.isna(val) or str(val).strip() in ["", "#VALUE!"]: return 0.0
-        return float(str(val).replace('%', '').replace(',', ''))
-    except:
-        return 0.0
-
-# --- CARD BANANE KA FUNCTION ---
 def draw_card(row):
     with st.container(border=True):
         raw_symbol = str(row['Stock Symbol']).strip()
         clean_symbol = raw_symbol.split(':')[-1] if ':' in raw_symbol else raw_symbol
         company_name = str(row.get('Company Name', '--'))
-
-        st.markdown(f"#### 🏷️ {raw_symbol}")
-        st.caption(f"{company_name}")
-        st.divider() 
-
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            st.metric(label="Entry Price", value=f"₹{row.get('Entry Price', 0)}")
-        with c2:
-            # Handle Blank/Error cells safely
-            live_p = row.get('Live Price', 0)
-            if pd.isna(live_p) or str(live_p).strip() in ["", "#VALUE!"]:
-                live_p = "--"
-            st.metric(label="Live Price", value=f"₹{live_p}")
-        with c3:
-            pnl_val = format_pct(row.get('Live P&L %', 0))
-            st.metric(label="Live P&L", value=pnl_val)
-
         status = str(row.get('Status', 'IN TRADE')).strip().upper()
-        if status == "TARGET HIT":
-            st.success("🎯 TARGET HIT")
-        elif status == "SL HIT":
-            st.error("🔴 SL HIT")
-        elif status == "TRAIL EXIT":
-            st.warning("🛡️ TRAIL EXIT")
-        elif status == "REPLACED":
-            st.secondary("🔄 REPLACED")
-        elif status == "WAITING":
-            st.info("⏳ WAITING")
+        
+        if status == "TARGET HIT": status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.6rem; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;'>■ TARGET HIT</span>"
+        elif status == "SL HIT": status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.6rem; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;'>■ SL HIT</span>"
+        elif status == "TRAIL EXIT": status_html = "<span style='color: #8b5cf6; font-weight: 800; font-size: 0.6rem; background: rgba(139,92,246,0.1); padding: 2px 6px; border-radius: 4px;'>🛡️ TRAIL EXIT</span>"
+        elif status == "REPLACED": status_html = "<span style='color: #64748b; font-weight: 800; font-size: 0.6rem; background: rgba(100,116,139,0.1); padding: 2px 6px; border-radius: 4px;'>🔄 REPLACED</span>"
+        elif status == "WAITING": status_html = "<span style='color: #f59e0b; font-weight: 800; font-size: 0.6rem; background: rgba(245,158,11,0.1); padding: 2px 6px; border-radius: 4px;'>⏳ PENDING</span>"
+        else: status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.6rem; background: rgba(59,130,246,0.1); padding: 2px 6px; border-radius: 4px;'>■ ACTIVE</span>"
+
+        entry_date = str(row.get('Entry Date', '--')).split(' ')[0]
+        if entry_date.lower() == 'nan': entry_date = '--'
+        hit_date = str(row.get('Hit Date', '--')).split(' ')[0]
+        if hit_date.lower() == 'nan': hit_date = '--'
+
+        date_str = f"ENTRY: {entry_date}"
+        if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"] and hit_date != '--': date_str += f" | EXIT: {hit_date}"
+
+        entry_p_val = safe_float(row.get('Entry Price', 0))
+        
+        # 🔥 UI FIX: CLOSED TRADES KA MATH LOCK KAR DIYA 🔥
+        if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"]:
+            if status == "TARGET HIT": exit_p_val = safe_float(row.get('Target Price', 0))
+            elif status == "SL HIT": exit_p_val = safe_float(row.get('SL Level', 0))
+            elif status == "TRAIL EXIT": exit_p_val = safe_float(row.get('Trailed SL', 0))
+            else: exit_p_val = safe_float(row.get('Live Price', 0)) # fallback for replaced
+
+            if entry_p_val > 0 and exit_p_val > 0:
+                calculated_pnl_pct = ((exit_p_val - entry_p_val) / entry_p_val) * 100
+            else:
+                calculated_pnl_pct = 0.0
+
+            calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
+            change_str = "CLOSED"
+            change_color = "#64748b"
+            pnl_title = "REALIZED P&L"
+            display_price = exit_p_val if exit_p_val > 0 else safe_float(row.get('Live Price', 0))
+            price_title = "Exit Price"
+        
         else:
-            st.info("🟡 IN TRADE")
+            # ACTIVE TRADES LOGIC
+            display_price = safe_float(row.get('Live Price', 0))
+            price_title = "Live Price"
+            pnl_title = "LIVE P&L (₹1L)"
+            
+            yf_change = get_yahoo_change(raw_symbol)
+            if yf_change: change_str = yf_change
+            else:
+                t_change_raw = str(row.get("Today's Change", "0")).strip()
+                val = safe_float(t_change_raw)
+                if '%' not in t_change_raw and abs(val) < 1.0 and val != 0: change_str = f"{val * 100:+.2f}%"
+                else: change_str = f"{val:+.2f}%"
 
-        st.divider()
-        screener_url = f"https://www.screener.in/company/{clean_symbol}/"
-        tv_url = f"https://in.tradingview.com/chart/?symbol={raw_symbol}"
-        st.markdown(f"[📊 Screener Data]({screener_url}) &nbsp; | &nbsp; [📈 TradingView Chart]({tv_url})")
+            change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
 
+            if status == "WAITING": 
+                calculated_pnl_amount = 0
+                calculated_pnl_pct = 0.0
+            else:
+                if entry_p_val > 0 and display_price > 0: 
+                    calculated_pnl_pct = ((display_price - entry_p_val) / entry_p_val) * 100
+                else:
+                    calculated_pnl_pct = safe_float(row.get('Live P&L %', 0))
+                calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
+
+        # HTML Formatting for P&L
+        if status == "WAITING": 
+            pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
+        elif calculated_pnl_amount > 0: 
+            pnl_html = f'<span style="color: #10b981; font-weight: 800;">+₹{calculated_pnl_amount:,.0f} <span style="font-size:0.6rem; opacity:0.8;">(+{calculated_pnl_pct:.2f}%)</span></span>'
+        elif calculated_pnl_amount < 0: 
+            pnl_html = f'<span style="color: #ef4444; font-weight: 800;">-₹{abs(calculated_pnl_amount):,.0f} <span style="font-size:0.6rem; opacity:0.8;">({calculated_pnl_pct:.2f}%)</span></span>'
+        else: 
+            pnl_html = f'<span style="font-weight: 800;">₹0 <span style="font-size:0.6rem; opacity:0.8;">(0.00%)</span></span>'
+
+        st.markdown(f"""
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+            <div style="font-weight: 900; font-size: 1.15rem; line-height: 1;">{clean_symbol}</div>
+            <div>{status_html}</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(148, 163, 184, 0.05); padding: 6px 8px; border-radius: 6px; margin-bottom: 5px; border: 1px solid rgba(148, 163, 184, 0.1);">
+            <div><div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700;">TODAY'S CHG</div><div style="font-size: 0.95rem; font-weight: 800; color: {change_color};">{change_str}</div></div>
+            <div style="text-align: right;"><div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700;">{pnl_title}</div><div style="font-size: 0.95rem;">{pnl_html}</div></div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        with st.expander("View Trade Details"):
+            st.markdown(f"""
+            <div style="font-size: 0.8rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px;">{company_name}</div>
+            <div style="font-size: 0.65rem; opacity: 0.6; font-weight: 600; margin-bottom: 10px;">{date_str}</div>
+            <div style="margin-bottom: 10px;"><div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700; text-transform: uppercase;">{price_title}</div><div style="font-size: 1.3rem; font-weight: 800; color: var(--text-color); line-height: 1.1;">₹{display_price}</div></div>
+            """, unsafe_allow_html=True)
+
+            tgt = safe_float(row.get('Target Price', 0))
+            orig_sl = safe_float(row.get('SL Level', 0))
+            trailed_sl = safe_float(row.get('Trailed SL', 0))
+            
+            if trailed_sl > orig_sl:
+                sl_display_html = f'<span class="data-value text-purple">₹{trailed_sl} <span style="font-size: 0.55rem;">(TRAILED)</span></span>'
+            else:
+                sl_display_html = f'<span class="data-value text-red">₹{orig_sl}</span>'
+
+            st.markdown(f"""
+            <div class="data-grid">
+                <div class="data-item"><span class="data-label">ENTRY POINT</span><span class="data-value">₹{entry_p_val}</span></div>
+                <div class="data-item"><span class="data-label">TARGET</span><span class="data-value text-green">₹{tgt}</span></div>
+                <div class="data-item"><span class="data-label">STOP LOSS</span>{sl_display_html}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            latest_news = get_live_news(company_name)
+            st.markdown(f"""
+            <div class="news-section">
+                <span class="news-icon">📰</span> 
+                <marquee class="news-marquee" scrollamount="4" onmouseover="this.stop();" onmouseout="this.start();">
+                    <a href="https://www.google.com/search?q={company_name.replace(' ', '+')}+stock+news&tbm=nws" target="_blank" style="color: inherit; text-decoration: none;">{latest_news}</a>
+                </marquee>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            btn1, btn2 = st.columns(2)
+            with btn1: st.link_button("DATA", f"https://www.screener.in/company/{clean_symbol}/", use_container_width=True)
+            with btn2: st.link_button("CHART", f"https://in.tradingview.com/chart/?symbol={raw_symbol}", use_container_width=True)
 
 if not df.empty:
+    active_trades_df = df[df['Status'].isin(["IN TRADE"])]
+    closed_trades_df = df[df['Status'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
     
-    # --- 10 LAKH PORTFOLIO P&L CALCULATION (FIXED HISTORY) ---
-    closed_trades = df[df['Status'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
-    total_realized_pnl = 0.0
-    
-    for _, row in closed_trades.iterrows():
-        entry = safe_float(row.get('Entry Price', 0))
-        status = str(row.get('Status', '')).strip().upper()
-        
-        # Exact calculation using fixed exit levels (Live price ignore karega)
-        exit_p = 0.0
-        if status == "TARGET HIT": exit_p = safe_float(row.get('Target Price', 0))
-        elif status == "SL HIT": exit_p = safe_float(row.get('SL Level', 0))
-        elif status == "TRAIL EXIT": exit_p = safe_float(row.get('Trailed SL', 0))
-        
-        if exit_p == 0: exit_p = safe_float(row.get('Live Price', 0))
-        
-        if entry > 0 and exit_p > 0:
-            pct_gain = (exit_p - entry) / entry
-            pnl_rs = pct_gain * INVESTMENT_PER_TRADE
-            total_realized_pnl += pnl_rs
+    total_active = len(active_trades_df)
+    total_closed = len(closed_trades_df)
 
-    portfolio_pct = (total_realized_pnl / TOTAL_PORTFOLIO_CAPITAL) * 100
-    
-    # Simple Portfolio Header
-    st.subheader("💼 Portfolio Snapshot (₹10 Lakh Capital)")
-    pnl_color = "green" if total_realized_pnl >= 0 else "red"
-    st.markdown(f"**Total Realized P&L:** :{pnl_color}[₹{total_realized_pnl:,.2f} ({portfolio_pct:+.2f}%)]")
-    st.divider()
+    # ACTIVE TRADES CUMULATIVE CALCULATION
+    cumulative_active_amount = 0.0
+    for _, row in active_trades_df.iterrows():
+        e_val = safe_float(row.get('Entry Price', 0))
+        l_val = safe_float(row.get('Live Price', 0))
+        if e_val > 0 and l_val > 0: 
+            trade_pct = ((l_val - e_val) / e_val) * 100
+            cumulative_active_amount += (trade_pct / 100) * INVESTMENT_PER_TRADE
 
-    tab1, tab2 = st.tabs(["📊 Active Trades", "📜 Closed Trades History"])
+    total_invested_amount = total_active * INVESTMENT_PER_TRADE
+    cumulative_active_pct = (cumulative_active_amount / total_invested_amount) * 100 if total_invested_amount > 0 else 0.0
+
+    pnl_color = "#10b981" if cumulative_active_amount > 0 else "#ef4444" if cumulative_active_amount < 0 else "inherit"
+    pnl_sign = "+" if cumulative_active_amount > 0 else ""
+    
+    st.markdown("##### 📈 Portfolio Snapshot")
+    st.markdown(f"""
+    <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+        <div style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Total Invested</div>
+            <div style="font-size: 1.2rem; font-weight: 900;">₹{total_active} Lakh</div>
+        </div>
+        <div style="flex: 1; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase;">Active / Closed</div>
+            <div style="font-size: 1.2rem; font-weight: 900;">{total_active} / {total_closed}</div>
+        </div>
+        <div style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center; display: flex; flex-direction: column; justify-content: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Current Live P&L (Active)</div>
+            <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
+                <div style="font-size: 1.6rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}₹{cumulative_active_amount:,.0f}</div>
+                <div style="font-size: 0.9rem; font-weight: 700; color: {pnl_color};">({pnl_sign}{cumulative_active_pct:.2f}%)</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
 
     with tab1:
         active_df = df[df['Status'].isin(["IN TRADE", "WAITING"])]
-        if active_df.empty:
-            st.info("Abhi koi active trade nahi hai.")
+        if active_df.empty: st.info("System currently idle. No active tracking.")
         else:
-            cols = st.columns(3)
+            cols = st.columns(4)
             active_df = active_df.reset_index(drop=True)
             for index, row in active_df.iterrows():
-                with cols[index % 3]:
-                    draw_card(row)
+                with cols[index % 4]: draw_card(row)
 
     with tab2:
-        history_df = closed_trades
-        if history_df.empty:
-            st.info("Abhi tak koi bhi trade close nahi hui hai.")
+        st.header("📜 Trade History")
+        history_df = closed_trades_df.copy()
+        
+        if not history_df.empty:
+            history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
+            history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
+
+            # 🔥 SMART P&L LOGIC FOR CLOSED TRADES (LOCKED) 🔥
+            def calculate_closed_pnl(row):
+                e_val = safe_float(row.get('Entry Price', 0))
+                status = str(row.get('Status', '')).strip().upper()
+                
+                exit_p = 0.0
+                if status == "TARGET HIT": exit_p = safe_float(row.get('Target Price', 0))
+                elif status == "SL HIT": exit_p = safe_float(row.get('SL Level', 0))
+                elif status == "TRAIL EXIT": exit_p = safe_float(row.get('Trailed SL', 0))
+                
+                if exit_p == 0: exit_p = safe_float(row.get('Live Price', 0))
+                
+                if e_val > 0 and exit_p > 0: 
+                    return ((exit_p - e_val) / e_val) * 100
+                return 0.0
+
+            history_df['Trade P&L (%) Num'] = history_df.apply(calculate_closed_pnl, axis=1)
+            history_df['Entry Price Num'] = history_df['Entry Price'].apply(lambda x: safe_float(x))
+            history_df['Trade P&L (₹)'] = (history_df['Trade P&L (%) Num'] / 100) * INVESTMENT_PER_TRADE
+
+            total_cumulative_pnl_amount = history_df['Trade P&L (₹)'].sum()
+            total_cumulative_pnl_pct = (total_cumulative_pnl_amount / TOTAL_PORTFOLIO_CAPITAL) * 100
+
+            hist_color = "#10b981" if total_cumulative_pnl_amount > 0 else "#ef4444" if total_cumulative_pnl_amount < 0 else "inherit"
+            hist_sign = "+" if total_cumulative_pnl_amount > 0 else ""
+            
+            st.markdown(f"""
+            <div style="margin-bottom: 15px;">
+                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L (Realized on ₹10L Capital)</div>
+                <div style="display: flex; align-items: baseline; gap: 8px;">
+                    <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}₹{total_cumulative_pnl_amount:,.0f}</div>
+                    <div style="font-size: 1rem; font-weight: 700; color: {hist_color};">({hist_sign}{total_cumulative_pnl_pct:.2f}%)</div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            st.divider()
+
+            history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
+            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status']
+            
+            if 'Entry Price' in history_df.columns and 'Entry Price Num' in history_df.columns:
+                history_df = history_df.drop('Entry Price', axis=1)
+            history_df = history_df.rename(columns={'Entry Price Num': 'Entry Price'})
+
+            columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
+            display_df = history_df[columns_to_keep].copy()
+
+            def color_status(val):
+                val_str = str(val).strip().upper()
+                if val_str == 'TARGET HIT': return 'color: #00FF00; font-weight: bold;' 
+                elif val_str == 'SL HIT': return 'color: #FF0000; font-weight: bold;' 
+                elif val_str == 'TRAIL EXIT': return 'color: #8b5cf6; font-weight: bold;' 
+                elif val_str == 'REPLACED': return 'color: #64748b; font-weight: bold;' 
+                return ''
+
+            def color_pnl(val):
+                val_str = str(val)
+                if '+' in val_str or (isinstance(val, (int, float)) and val > 0): return 'color: #00FF00;' 
+                elif '-' in val_str or (isinstance(val, (int, float)) and val < 0): return 'color: #FF0000;' 
+                return ''
+
+            format_dict = {
+                "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
+                "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
+                "Entry Price": "{:.2f}",  
+                "Trade P&L (₹)": lambda x: f"₹{safe_float(x):+,.0f}",
+                "Trade P&L (%)": lambda x: f"{safe_float(x):+.2f}%" 
+            }
+
+            styled_history_df = display_df.style.map(color_status, subset=['Status']) \
+                                                .map(color_pnl, subset=['Trade P&L (₹)', 'Trade P&L (%)']) \
+                                                .format(format_dict)
+
+            st.dataframe(styled_history_df, use_container_width=True, hide_index=True)
         else:
-            cols = st.columns(3)
-            history_df = history_df.reset_index(drop=True)
-            for index, row in history_df.iterrows():
-                with cols[index % 3]:
-                    draw_card(row)
-else:
-    st.warning("⚠️ Google Sheet ekdum khali hai ya URL block ho raha hai.")
+            st.info("No closed trades found in history yet.")
+            
+time.sleep(5)
+st.rerun()
