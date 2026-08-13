@@ -124,7 +124,6 @@ def load_data():
         data.columns = [str(c).strip() for c in data.columns]
         data = data.dropna(subset=['Stock Symbol'])
         
-        # Safe Status Cleaning
         if 'Status' in data.columns:
             data['Status_Clean'] = data['Status'].astype(str).str.strip().str.upper()
         else:
@@ -159,12 +158,18 @@ def draw_card(row):
 
         entry_p_val = safe_float(row.get('Entry Price', 0))
         
-        # 🔥 LOCKED MATH FOR CLOSED TRADES 🔥
         if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"]:
-            if status == "TARGET HIT": exit_p_val = safe_float(row.get('Target Price', 0))
-            elif status == "SL HIT": exit_p_val = safe_float(row.get('SL Level', 0))
-            elif status == "TRAIL EXIT": exit_p_val = safe_float(row.get('Trailed SL', 0))
-            else: exit_p_val = safe_float(row.get('Live Price', 0)) 
+            if status == "TARGET HIT": 
+                exit_p_val = safe_float(row.get('Target Price', 0))
+            elif status == "SL HIT": 
+                # 🚀 FIX: Ab SL HIT me bhi check karega ki Trail SL bada toh nahi tha
+                orig_sl = safe_float(row.get('SL Level', 0))
+                trail_sl = safe_float(row.get('Trailed SL', 0))
+                exit_p_val = trail_sl if trail_sl > orig_sl else orig_sl
+            elif status == "TRAIL EXIT": 
+                exit_p_val = safe_float(row.get('Trailed SL', 0))
+            else: 
+                exit_p_val = safe_float(row.get('Live Price', 0)) 
 
             if entry_p_val > 0 and exit_p_val > 0:
                 calculated_pnl_pct = ((exit_p_val - entry_p_val) / entry_p_val) * 100
@@ -322,9 +327,15 @@ if not df.empty:
                 status = str(row.get('Status_Clean', '')).strip().upper()
                 
                 exit_p = 0.0
-                if status == "TARGET HIT": exit_p = safe_float(row.get('Target Price', 0))
-                elif status == "SL HIT": exit_p = safe_float(row.get('SL Level', 0))
-                elif status == "TRAIL EXIT": exit_p = safe_float(row.get('Trailed SL', 0))
+                if status == "TARGET HIT": 
+                    exit_p = safe_float(row.get('Target Price', 0))
+                elif status == "SL HIT": 
+                    # 🚀 FIX: Ab SL HIT me bhi check karega ki Trail SL bada toh nahi tha
+                    orig = safe_float(row.get('SL Level', 0))
+                    trail = safe_float(row.get('Trailed SL', 0))
+                    exit_p = trail if trail > orig else orig
+                elif status == "TRAIL EXIT": 
+                    exit_p = safe_float(row.get('Trailed SL', 0))
                 
                 if exit_p == 0: exit_p = safe_float(row.get('Live Price', 0))
                 
