@@ -158,17 +158,12 @@ def draw_card(row):
 
         entry_p_val = safe_float(row.get('Entry Price', 0))
         
+        # 🚀 UPDATE: Now directly reads from the 'Exit Price' column for closed trades
         if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"]:
-            if status == "TARGET HIT": 
-                exit_p_val = safe_float(row.get('Target Price', 0))
-            elif status == "SL HIT": 
-                # 🚀 FIX: Ab SL HIT me bhi check karega ki Trail SL bada toh nahi tha
-                orig_sl = safe_float(row.get('SL Level', 0))
-                trail_sl = safe_float(row.get('Trailed SL', 0))
-                exit_p_val = trail_sl if trail_sl > orig_sl else orig_sl
-            elif status == "TRAIL EXIT": 
-                exit_p_val = safe_float(row.get('Trailed SL', 0))
-            else: 
+            exit_p_val = safe_float(row.get('Exit Price', 0))
+            
+            # Fallback agar manual update karna bacha ho purani trades me
+            if exit_p_val == 0:
                 exit_p_val = safe_float(row.get('Live Price', 0)) 
 
             if entry_p_val > 0 and exit_p_val > 0:
@@ -324,20 +319,12 @@ if not df.empty:
 
             def calculate_closed_pnl(row):
                 e_val = safe_float(row.get('Entry Price', 0))
-                status = str(row.get('Status_Clean', '')).strip().upper()
                 
-                exit_p = 0.0
-                if status == "TARGET HIT": 
-                    exit_p = safe_float(row.get('Target Price', 0))
-                elif status == "SL HIT": 
-                    # 🚀 FIX: Ab SL HIT me bhi check karega ki Trail SL bada toh nahi tha
-                    orig = safe_float(row.get('SL Level', 0))
-                    trail = safe_float(row.get('Trailed SL', 0))
-                    exit_p = trail if trail > orig else orig
-                elif status == "TRAIL EXIT": 
-                    exit_p = safe_float(row.get('Trailed SL', 0))
+                # 🚀 UPDATE: Simple logic to read from Exit Price column directly!
+                exit_p = safe_float(row.get('Exit Price', 0))
                 
-                if exit_p == 0: exit_p = safe_float(row.get('Live Price', 0))
+                if exit_p == 0:  # Fallback for old trades missing an exit price in column P
+                    exit_p = safe_float(row.get('Live Price', 0))
                 
                 if e_val > 0 and exit_p > 0: 
                     return ((exit_p - e_val) / e_val) * 100
