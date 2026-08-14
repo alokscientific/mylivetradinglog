@@ -158,11 +158,8 @@ def draw_card(row):
 
         entry_p_val = safe_float(row.get('Entry Price', 0))
         
-        # 🚀 UPDATE: Now directly reads from the 'Exit Price' column for closed trades
         if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"]:
             exit_p_val = safe_float(row.get('Exit Price', 0))
-            
-            # Fallback agar manual update karna bacha ho purani trades me
             if exit_p_val == 0:
                 exit_p_val = safe_float(row.get('Live Price', 0)) 
 
@@ -317,15 +314,18 @@ if not df.empty:
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
+            # 🚀 Get exact Exit Price, fall back to Live Price only if blank
+            def get_final_exit_price(row):
+                exit_p = safe_float(row.get('Exit Price', 0))
+                if exit_p == 0: 
+                    exit_p = safe_float(row.get('Live Price', 0))
+                return exit_p
+                
+            history_df['Exit Price Num'] = history_df.apply(get_final_exit_price, axis=1)
+
             def calculate_closed_pnl(row):
                 e_val = safe_float(row.get('Entry Price', 0))
-                
-                # 🚀 UPDATE: Simple logic to read from Exit Price column directly!
-                exit_p = safe_float(row.get('Exit Price', 0))
-                
-                if exit_p == 0:  # Fallback for old trades missing an exit price in column P
-                    exit_p = safe_float(row.get('Live Price', 0))
-                
+                exit_p = safe_float(row.get('Exit Price Num', 0))
                 if e_val > 0 and exit_p > 0: 
                     return ((exit_p - e_val) / e_val) * 100
                 return 0.0
@@ -352,11 +352,17 @@ if not df.empty:
             st.divider()
 
             history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
-            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status']
             
             if 'Entry Price' in history_df.columns and 'Entry Price Num' in history_df.columns:
                 history_df = history_df.drop('Entry Price', axis=1)
             history_df = history_df.rename(columns={'Entry Price Num': 'Entry Price'})
+            
+            if 'Exit Price' in history_df.columns and 'Exit Price Num' in history_df.columns:
+                history_df = history_df.drop('Exit Price', axis=1)
+            history_df = history_df.rename(columns={'Exit Price Num': 'Exit Price'})
+
+            # 🚀 Added Exit Price to the table 🚀
+            columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price', 'Exit Price', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status']
 
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
@@ -379,6 +385,7 @@ if not df.empty:
                 "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Entry Price": "{:.2f}",  
+                "Exit Price": "{:.2f}",  # 🚀 Properly formats the new Exit Price column
                 "Trade P&L (₹)": lambda x: f"₹{safe_float(x):+,.0f}",
                 "Trade P&L (%)": lambda x: f"{safe_float(x):+.2f}%" 
             }
