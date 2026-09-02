@@ -71,24 +71,34 @@ def safe_float(val, default=0.0):
     try: return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
     except: return default
 
-# Yeh function direct Yahoo Server se Today's Change layega bina kisi library cache ke
-@st.cache_data(ttl=60)
+# 🚀 UPGRADED YAHOO FETCHER (Anti-Block & Multi-Agent)
+@st.cache_data(ttl=30) # Cache time reduced to 30 seconds
 def get_yahoo_change(symbol):
+    import json
+    import urllib.request
+    import random
     try:
-        import json
         yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
         if "BSE:" in symbol: yf_sym = symbol.replace("BSE:", "") + ".BO"
         
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}?interval=1d&range=2d"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
-        response = urllib.request.urlopen(req, timeout=3)
+        # Rotating User-Agents to prevent Yahoo from blocking
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15'
+        ]
+        
+        # Using query2 endpoint which is more reliable
+        url = f"https://query2.finance.yahoo.com/v8/finance/chart/{yf_sym}?interval=1d&range=2d"
+        req = urllib.request.Request(url, headers={'User-Agent': random.choice(user_agents), 'Accept': 'application/json'})
+        
+        response = urllib.request.urlopen(req, timeout=4)
         data = json.loads(response.read())
         
         meta = data['chart']['result'][0]['meta']
         prev_close = meta['chartPreviousClose']
         curr_price = meta['regularMarketPrice']
         
-        if prev_close and prev_close > 0:
+        if prev_close and curr_price and prev_close > 0:
             return f"{((curr_price - prev_close) / prev_close) * 100:+.2f}%"
     except Exception as e:
         pass
