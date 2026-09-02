@@ -223,19 +223,27 @@ def draw_card(row):
             <div style="margin-bottom: 10px;"><div style="font-size: 0.6rem; opacity: 0.7; font-weight: 700; text-transform: uppercase;">{price_title}</div><div style="font-size: 1.3rem; font-weight: 800; color: var(--text-color); line-height: 1.1;">₹{display_price}</div></div>
             """, unsafe_allow_html=True)
 
-            tgt = safe_float(row.get('Target Price', 0))
+            # --- TARGET & STOP LOSS TRAILING LOGIC UI ---
+            orig_tgt = safe_float(row.get('Target Price', 0))
+            trailed_tgt = safe_float(row.get('Trailed Target', 0))
+            
+            if trailed_tgt > orig_tgt:
+                tgt_display_html = f'<span class="data-value text-green">₹{trailed_tgt} <br><span style="font-size: 0.55rem;">(TRAILED)</span></span>'
+            else:
+                tgt_display_html = f'<span class="data-value text-green">₹{orig_tgt}</span>'
+
             orig_sl = safe_float(row.get('SL Level', 0))
             trailed_sl = safe_float(row.get('Trailed SL', 0))
             
             if trailed_sl > orig_sl:
-                sl_display_html = f'<span class="data-value text-purple">₹{trailed_sl} <span style="font-size: 0.55rem;">(TRAILED)</span></span>'
+                sl_display_html = f'<span class="data-value text-purple">₹{trailed_sl} <br><span style="font-size: 0.55rem;">(TRAILED)</span></span>'
             else:
                 sl_display_html = f'<span class="data-value text-red">₹{orig_sl}</span>'
 
             st.markdown(f"""
             <div class="data-grid">
                 <div class="data-item"><span class="data-label">ENTRY POINT</span><span class="data-value">₹{entry_p_val}</span></div>
-                <div class="data-item"><span class="data-label">TARGET</span><span class="data-value text-green">₹{tgt}</span></div>
+                <div class="data-item"><span class="data-label">TARGET</span>{tgt_display_html}</div>
                 <div class="data-item"><span class="data-label">STOP LOSS</span>{sl_display_html}</div>
             </div>
             """, unsafe_allow_html=True)
@@ -314,7 +322,6 @@ if not df.empty:
             history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
             history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
 
-            # 🚀 Get exact Exit Price, fall back to Live Price only if blank
             def get_final_exit_price(row):
                 exit_p = safe_float(row.get('Exit Price', 0))
                 if exit_p == 0: 
@@ -361,9 +368,7 @@ if not df.empty:
                 history_df = history_df.drop('Exit Price', axis=1)
             history_df = history_df.rename(columns={'Exit Price Num': 'Exit Price'})
 
-            # 🚀 Added Exit Price to the table 🚀
             columns_to_keep = ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price', 'Exit Price', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status']
-
             columns_to_keep = [col for col in columns_to_keep if col in history_df.columns]
             display_df = history_df[columns_to_keep].copy()
 
@@ -385,7 +390,7 @@ if not df.empty:
                 "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
                 "Entry Price": "{:.2f}",  
-                "Exit Price": "{:.2f}",  # 🚀 Properly formats the new Exit Price column
+                "Exit Price": "{:.2f}",  
                 "Trade P&L (₹)": lambda x: f"₹{safe_float(x):+,.0f}",
                 "Trade P&L (%)": lambda x: f"{safe_float(x):+.2f}%" 
             }
