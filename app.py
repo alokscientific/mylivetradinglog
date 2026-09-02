@@ -44,27 +44,21 @@ html, body, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFo
 .news-section { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%); border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; }
 .news-icon { font-size: 1rem; margin-right: 8px; }
 .news-marquee { color: #60a5fa; font-weight: 600; font-size: 0.75rem; }
-.stButton button { padding: 8px 10px !important; font-weight: 700; border-radius: 6px; background-color: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; }
 </style>
 """, unsafe_allow_html=True)
 
-col_head, col_btn = st.columns([0.85, 0.15])
-with col_head:
-    st.markdown("""
-    <div class="header-container">
-        <div class="main-title">TRADE LOG SYSTEM</div>
-        <div class="sub-title">Track & Trade Terminal</div>
-    </div>
-    """, unsafe_allow_html=True)
-with col_btn:
-    if st.button("🔄 Refresh Data", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+# Main Title (No Refresh Button)
+st.markdown("""
+<div class="header-container">
+    <div class="main-title">TRADE LOG SYSTEM</div>
+    <div class="sub-title">Track & Trade Terminal</div>
+</div>
+""", unsafe_allow_html=True)
 
 st.markdown("""
 <div style="background-color: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 6px 12px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid rgba(245, 158, 11, 0.2);">
     <span style="font-size: 1.1rem; margin-right: 10px;">⚠️</span>
-    <marquee scrollamount="5" onmouseover="this.stop();" onmouseout="this.start();" style="color: #d97706; font-weight: 700; font-size: 0.85rem;">
+    <marquee scrollamount="5" style="color: #d97706; font-weight: 700; font-size: 0.85rem;">
         DISCLAIMER: I am not a SEBI registered advisor. This is my personal vlog / trade log and is strictly for educational purposes only. 
     </marquee>
 </div>
@@ -107,7 +101,6 @@ def load_data():
 
 df = load_data()
 
-# 🚀 PRE-FETCH ENGINE FOR NEWS
 if not df.empty:
     active_df = df[df['Status_Clean'].isin(["IN TRADE"])]
     if not active_df.empty:
@@ -146,7 +139,6 @@ def draw_card(row):
             display_price = safe_float(row.get('Live Price', 0))
             price_title, pnl_title = "Live Price", "LIVE P&L (₹1L)"
             
-            # 🚀 ROBUST SHEET DATA FETCH (Grabs exact Column F / Index 5 safely)
             try:
                 t_change_raw = str(row.iloc[5]).strip()
             except:
@@ -178,7 +170,6 @@ def draw_card(row):
         </div>
         """, unsafe_allow_html=True)
 
-        # 🚀 NEWS TICKER IS INSIDE THIS EXPANDER
         with st.expander("View Trade Details"):
             st.markdown(f"""
             <div style="font-size: 0.8rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px;">{company_name}</div>
@@ -206,7 +197,7 @@ def draw_card(row):
             st.markdown(f"""
             <div class="news-section">
                 <span class="news-icon">📰</span> 
-                <marquee class="news-marquee" scrollamount="4" onmouseover="this.stop();" onmouseout="this.start();">
+                <marquee class="news-marquee" scrollamount="4">
                     <a href="https://www.google.com/search?q={company_name.replace(' ', '+')}+stock+news&tbm=nws" target="_blank" style="color: inherit; text-decoration: none;">{latest_news}</a>
                 </marquee>
             </div>
@@ -346,6 +337,5 @@ if not df.empty:
         else:
             st.info("No closed trades found in history yet.")
 
-# Restored stable 60-second background auto-refresh
 time.sleep(60)
 st.rerun()
