@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import urllib.request
 import urllib.parse
-import json
 import xml.etree.ElementTree as ET
+import yfinance as yf
 import time
-import random
+import concurrent.futures
 
 # --- CONSTANT INVESTMENT SETTINGS ---
 INVESTMENT_PER_TRADE = 100000
@@ -25,9 +25,7 @@ footer {visibility: hidden !important;}
 .stAppDeployButton {display: none !important; visibility: hidden !important;}
 
 html, body, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-.stIconMaterial, [data-testid="stIconMaterial"], .material-symbols-rounded { font-family: 'Material Symbols Rounded' !important; }
-
-.header-container { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 20px; }
+.header-container { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 10px; }
 .main-title { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 8px 20px; border-radius: 8px; font-weight: 900; font-size: 1.6rem; letter-spacing: 1.5px; box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); margin-bottom: 4px; display: inline-block; }
 .sub-title { color: var(--text-color); opacity: 0.7; font-size: 0.85rem; font-weight: 600; letter-spacing: 0.5px; margin-left: 24px; }
 
@@ -44,24 +42,34 @@ html, body, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFo
 .text-green { color: #10b981 !important; }
 .text-red { color: #ef4444 !important; }
 .text-purple { color: #8b5cf6 !important; }
-
-.news-section { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%); border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; overflow: hidden; }
-.news-icon { font-size: 1rem; margin-right: 8px; z-index: 2; background: inherit; }
-.news-marquee-container { width: 100%; overflow: hidden; white-space: nowrap; position: relative; }
-.news-marquee-text { display: inline-block; padding-left: 100%; animation: scrollText 15s linear infinite; color: #60a5fa; font-weight: 600; font-size: 0.75rem; }
-@keyframes scrollText { 0% { transform: translateX(0%); } 100% { transform: translateX(-100%); } }
-
-.stButton button { padding: 2px 10px !important; min-height: 0 !important; }
+.news-section { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%); border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; }
+.news-icon { font-size: 1rem; margin-right: 8px; }
+.news-marquee { color: #60a5fa; font-weight: 600; font-size: 0.75rem; }
+.stButton button { padding: 8px 10px !important; font-weight: 700; border-radius: 6px; background-color: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; }
 </style>
 """, unsafe_allow_html=True)
 
+col_head, col_btn = st.columns([0.85, 0.15])
+with col_head:
+    st.markdown("""
+    <div class="header-container">
+        <div class="main-title">TRADE LOG SYSTEM</div>
+        <div class="sub-title">Track & Trade Terminal</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col_btn:
+    if st.button("🔄 Refresh", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
+
 st.markdown("""
-<div class="header-container">
-    <div class="main-title">TRADE LOG SYSTEM</div>
-    <div class="sub-title">Track & Trade Terminal</div>
+<div style="background-color: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 6px 12px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid rgba(245, 158, 11, 0.2);">
+    <span style="font-size: 1.1rem; margin-right: 10px;">⚠️</span>
+    <marquee scrollamount="5" onmouseover="this.stop();" onmouseout="this.start();" style="color: #d97706; font-weight: 700; font-size: 0.85rem;">
+        DISCLAIMER: I am not a SEBI registered advisor. This is my personal vlog / trade log and is strictly for educational purposes only. 
+    </marquee>
 </div>
 """, unsafe_allow_html=True)
-st.divider()
 
 def safe_float(val, default=0.0):
     if pd.isna(val): return default
@@ -70,32 +78,16 @@ def safe_float(val, default=0.0):
     try: return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
     except: return default
 
-# 🚀 CACHE BUSTER FUNCTION: Naya naam, Nayi shuruaat (Bypasses old cache completely)
-@st.cache_data(ttl=30)
-def get_daily_change_fresh(symbol):
+@st.cache_data(ttl=60)
+def get_yahoo_change(symbol):
     try:
         yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
         if "BSE:" in symbol: yf_sym = symbol.replace("BSE:", "") + ".BO"
-        
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
-        ]
-        
-        url = f"https://query2.finance.yahoo.com/v8/finance/chart/{yf_sym}?interval=1d&range=2d"
-        req = urllib.request.Request(url, headers={'User-Agent': random.choice(user_agents), 'Accept': 'application/json'})
-        response = urllib.request.urlopen(req, timeout=3)
-        data = json.loads(response.read())
-        
-        meta = data['chart']['result'][0]['meta']
-        prev_close = meta['chartPreviousClose']
-        curr_price = meta['regularMarketPrice']
-        
-        if prev_close and curr_price and prev_close > 0:
-            return f"{((curr_price - prev_close) / prev_close) * 100:+.2f}%"
-    except Exception:
-        pass
+        tkr = yf.Ticker(yf_sym)
+        prev = tkr.fast_info['previous_close']
+        curr = tkr.fast_info['last_price']
+        if prev and prev > 0: return f"{((curr - prev) / prev) * 100:+.2f}%"
+    except: pass
     return None
 
 @st.cache_data(ttl=1800)
@@ -110,7 +102,7 @@ def get_live_news(company_name):
         headlines = [item.find('title').text for item in root.findall('.//item')[:2]]
         if headlines: return " &nbsp; ✦ &nbsp; ".join(headlines)
     except: pass
-    return f"Tracking latest updates for {company_name}..."
+    return f"Tracking updates for {company_name}..."
 
 SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
 MAIN_GID = "1424037063"
@@ -122,14 +114,20 @@ def load_data():
         data = pd.read_csv(MAIN_CSV_URL)
         data.columns = [str(c).strip() for c in data.columns]
         data = data.dropna(subset=['Stock Symbol'])
-        if 'Status' in data.columns:
-            data['Status_Clean'] = data['Status'].astype(str).str.strip().str.upper()
-        else:
-            data['Status_Clean'] = "IN TRADE"
+        data['Status_Clean'] = data['Status'].astype(str).str.strip().str.upper() if 'Status' in data.columns else "IN TRADE"
         return data
-    except Exception as e: return pd.DataFrame()
+    except Exception: return pd.DataFrame()
 
 df = load_data()
+
+# 🚀 PRE-FETCH ENGINE (1-SECOND LOAD FIX)
+if not df.empty:
+    active_df = df[df['Status_Clean'].isin(["IN TRADE"])]
+    if not active_df.empty:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            for _, row in active_df.iterrows():
+                executor.submit(get_yahoo_change, str(row['Stock Symbol']).strip())
+                executor.submit(get_live_news, str(row.get('Company Name', '--')))
 
 def draw_card(row):
     with st.container(border=True):
@@ -138,46 +136,38 @@ def draw_card(row):
         company_name = str(row.get('Company Name', '--'))
         status = row.get('Status_Clean', 'IN TRADE')
         
+        status_html = f"<span style='color: #3b82f6; font-weight: 800; font-size: 0.6rem; background: rgba(59,130,246,0.1); padding: 2px 6px; border-radius: 4px;'>■ ACTIVE</span>"
         if status == "TARGET HIT": status_html = "<span style='color: #10b981; font-weight: 800; font-size: 0.6rem; background: rgba(16,185,129,0.1); padding: 2px 6px; border-radius: 4px;'>■ TARGET HIT</span>"
         elif status == "SL HIT": status_html = "<span style='color: #ef4444; font-weight: 800; font-size: 0.6rem; background: rgba(239,68,68,0.1); padding: 2px 6px; border-radius: 4px;'>■ SL HIT</span>"
         elif status == "TRAIL EXIT": status_html = "<span style='color: #8b5cf6; font-weight: 800; font-size: 0.6rem; background: rgba(139,92,246,0.1); padding: 2px 6px; border-radius: 4px;'>🛡️ TRAIL EXIT</span>"
-        elif status == "REPLACED": status_html = "<span style='color: #64748b; font-weight: 800; font-size: 0.6rem; background: rgba(100,116,139,0.1); padding: 2px 6px; border-radius: 4px;'>🔄 REPLACED</span>"
         elif status == "WAITING": status_html = "<span style='color: #f59e0b; font-weight: 800; font-size: 0.6rem; background: rgba(245,158,11,0.1); padding: 2px 6px; border-radius: 4px;'>⏳ PENDING</span>"
-        else: status_html = "<span style='color: #3b82f6; font-weight: 800; font-size: 0.6rem; background: rgba(59,130,246,0.1); padding: 2px 6px; border-radius: 4px;'>■ ACTIVE</span>"
 
         entry_date = str(row.get('Entry Date', '--')).split(' ')[0]
-        hit_date = str(row.get('Hit Date', '--')).split(' ')[0]
-        date_str = f"ENTRY: {entry_date}" if entry_date.lower() != 'nan' else "ENTRY: --"
-        if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"] and hit_date.lower() != 'nan': date_str += f" | EXIT: {hit_date}"
+        entry_date = '--' if entry_date.lower() == 'nan' else entry_date
+        date_str = f"ENTRY: {entry_date}"
 
         entry_p_val = safe_float(row.get('Entry Price', 0))
         
         if status in ["TARGET HIT", "SL HIT", "TRAIL EXIT", "REPLACED"]:
             exit_p_val = safe_float(row.get('Exit Price', 0))
             if exit_p_val == 0: exit_p_val = safe_float(row.get('Live Price', 0)) 
-            calculated_pnl_pct = ((exit_p_val - entry_p_val) / entry_p_val) * 100 if entry_p_val > 0 else 0.0
+            calculated_pnl_pct = ((exit_p_val - entry_p_val) / entry_p_val) * 100 if entry_p_val > 0 and exit_p_val > 0 else 0.0
             calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
-            change_str = "CLOSED"
-            change_color = "#64748b"
-            pnl_title = "REALIZED P&L"
+            change_str, change_color, pnl_title = "CLOSED", "#64748b", "REALIZED P&L"
             display_price = exit_p_val if exit_p_val > 0 else safe_float(row.get('Live Price', 0))
             price_title = "Exit Price"
         else:
             display_price = safe_float(row.get('Live Price', 0))
-            price_title = "Live Price"
-            pnl_title = "LIVE P&L (₹1L)"
+            price_title, pnl_title = "Live Price", "LIVE P&L (₹1L)"
             
-            # 🚀 NAYA CACHE BUSTER FUNCTION CALL YAHAN HAI
-            yf_change = get_daily_change_fresh(raw_symbol)
-            
+            yf_change = get_yahoo_change(raw_symbol)
             if yf_change: change_str = yf_change
             else:
-                t_change_raw = str(row.get("Today's Change", row.get("Today's Chg", "0"))).strip()
-                val = safe_float(t_change_raw)
-                change_str = f"{val * 100:+.2f}%" if '%' not in t_change_raw and abs(val) < 1.0 and val != 0 else f"{val:+.2f}%"
-
+                val = safe_float(str(row.get("Today's Change", "0")).strip())
+                change_str = f"{val:+.2f}%"
+            
             change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
-            calculated_pnl_pct = ((display_price - entry_p_val) / entry_p_val) * 100 if entry_p_val > 0 else safe_float(row.get('Live P&L %', 0))
+            calculated_pnl_pct = ((display_price - entry_p_val) / entry_p_val) * 100 if entry_p_val > 0 and display_price > 0 else safe_float(row.get('Live P&L %', 0))
             calculated_pnl_amount = (calculated_pnl_pct / 100) * INVESTMENT_PER_TRADE
 
         if status == "WAITING": pnl_html = '<span style="font-weight: 800; opacity: 0.5;">--</span>'
@@ -205,17 +195,17 @@ def draw_card(row):
 
             orig_tgt = safe_float(row.get('Target Price', 0))
             trailed_tgt = safe_float(row.get('Trailed Target', 0))
-            tgt_display_html = f'<span class="data-value text-green">₹{trailed_tgt} <br><span style="font-size: 0.55rem;">(TRAILED)</span></span>' if trailed_tgt > orig_tgt else f'<span class="data-value text-green">₹{orig_tgt}</span>'
+            tgt_html = f'<span class="data-value text-green">₹{trailed_tgt} <br><span style="font-size: 0.55rem;">(TRAILED)</span></span>' if trailed_tgt > orig_tgt else f'<span class="data-value text-green">₹{orig_tgt}</span>'
 
             orig_sl = safe_float(row.get('SL Level', 0))
             trailed_sl = safe_float(row.get('Trailed SL', 0))
-            sl_display_html = f'<span class="data-value text-purple">₹{trailed_sl} <br><span style="font-size: 0.55rem;">(TRAILED)</span></span>' if trailed_sl > orig_sl else f'<span class="data-value text-red">₹{orig_sl}</span>'
+            sl_html = f'<span class="data-value text-purple">₹{trailed_sl} <br><span style="font-size: 0.55rem;">(TRAILED)</span></span>' if trailed_sl > orig_sl else f'<span class="data-value text-red">₹{orig_sl}</span>'
 
             st.markdown(f"""
             <div class="data-grid">
-                <div class="data-item"><span class="data-label">ENTRY POINT</span><span class="data-value">₹{entry_p_val}</span></div>
-                <div class="data-item"><span class="data-label">TARGET</span>{tgt_display_html}</div>
-                <div class="data-item"><span class="data-label">STOP LOSS</span>{sl_display_html}</div>
+                <div class="data-item"><span class="data-label">ENTRY</span><span class="data-value">₹{entry_p_val}</span></div>
+                <div class="data-item"><span class="data-label">TARGET</span>{tgt_html}</div>
+                <div class="data-item"><span class="data-label">STOP LOSS</span>{sl_html}</div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -223,9 +213,9 @@ def draw_card(row):
             st.markdown(f"""
             <div class="news-section">
                 <span class="news-icon">📰</span> 
-                <div class="news-marquee-container">
-                    <a href="https://www.google.com/search?q={company_name.replace(' ', '+')}+stock+news&tbm=nws" target="_blank" class="news-marquee-text" style="text-decoration: none;">{latest_news}</a>
-                </div>
+                <marquee class="news-marquee" scrollamount="4" onmouseover="this.stop();" onmouseout="this.start();">
+                    <a href="https://www.google.com/search?q={company_name.replace(' ', '+')}+stock+news&tbm=nws" target="_blank" style="color: inherit; text-decoration: none;">{latest_news}</a>
+                </marquee>
             </div>
             """, unsafe_allow_html=True)
             
@@ -237,20 +227,12 @@ if not df.empty:
     active_trades_df = df[df['Status_Clean'].isin(["IN TRADE"])]
     closed_trades_df = df[df['Status_Clean'].isin(["SL HIT", "TARGET HIT", "TRAIL EXIT", "REPLACED"])]
     
-    total_active = len(active_trades_df)
-    total_closed = len(closed_trades_df)
-
-    cumulative_active_amount = 0.0
-    for _, row in active_trades_df.iterrows():
-        e_val = safe_float(row.get('Entry Price', 0))
-        l_val = safe_float(row.get('Live Price', 0))
-        if e_val > 0 and l_val > 0: 
-            cumulative_active_amount += (((l_val - e_val) / e_val) * 100 / 100) * INVESTMENT_PER_TRADE
-
+    total_active, total_closed = len(active_trades_df), len(closed_trades_df)
+    cumulative_active_amount = sum([(((safe_float(row.get('Live Price', 0)) - safe_float(row.get('Entry Price', 0))) / safe_float(row.get('Entry Price', 0))) * INVESTMENT_PER_TRADE) for _, row in active_trades_df.iterrows() if safe_float(row.get('Entry Price', 0)) > 0 and safe_float(row.get('Live Price', 0)) > 0])
+    
     total_invested_amount = total_active * INVESTMENT_PER_TRADE
     cumulative_active_pct = (cumulative_active_amount / total_invested_amount) * 100 if total_invested_amount > 0 else 0.0
-    pnl_color = "#10b981" if cumulative_active_amount > 0 else "#ef4444" if cumulative_active_amount < 0 else "inherit"
-    pnl_sign = "+" if cumulative_active_amount > 0 else ""
+    pnl_color, pnl_sign = ("#10b981", "+") if cumulative_active_amount > 0 else ("#ef4444", "") if cumulative_active_amount < 0 else ("inherit", "")
     
     st.markdown("##### 📈 Portfolio Snapshot")
     st.markdown(f"""
@@ -264,7 +246,7 @@ if not df.empty:
             <div style="font-size: 1.2rem; font-weight: 900;">{total_active} / {total_closed}</div>
         </div>
         <div style="flex: 2; padding: 12px; border-radius: 8px; border: 1px solid rgba(59, 130, 246, 0.2); background: rgba(59, 130, 246, 0.05); text-align: center; display: flex; flex-direction: column; justify-content: center;">
-            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Current Live P&L (Active)</div>
+            <div style="font-size: 0.7rem; font-weight: 700; opacity: 0.7; text-transform: uppercase; margin-bottom: 4px;">Live P&L</div>
             <div style="display: flex; justify-content: center; align-items: baseline; gap: 8px;">
                 <div style="font-size: 1.6rem; font-weight: 900; color: {pnl_color}; line-height: 1;">{pnl_sign}₹{cumulative_active_amount:,.0f}</div>
                 <div style="font-size: 0.9rem; font-weight: 700; color: {pnl_color};">({pnl_sign}{cumulative_active_pct:.2f}%)</div>
@@ -274,85 +256,12 @@ if not df.empty:
     """, unsafe_allow_html=True)
 
     tab1, tab2 = st.tabs(["📊 ACTIVE TRADE", "📜 TRADE HISTORY"])
-
     with tab1:
-        if active_trades_df.empty: st.info("System currently idle. No active tracking.")
+        if active_trades_df.empty: st.info("System idle.")
         else:
             cols = st.columns(4)
             for index, row in active_trades_df.reset_index(drop=True).iterrows():
                 with cols[index % 4]: draw_card(row)
-
     with tab2:
         st.header("📜 Trade History")
-        history_df = closed_trades_df.copy()
-        
-        if not history_df.empty:
-            history_df['Entry Date'] = pd.to_datetime(history_df['Entry Date'], format='%d/%m/%Y', errors='coerce')
-            history_df['Hit Date'] = pd.to_datetime(history_df['Hit Date'], format='%d/%m/%Y', errors='coerce')
-
-            def get_final_exit_price(row):
-                exit_p = safe_float(row.get('Exit Price', 0))
-                return exit_p if exit_p > 0 else safe_float(row.get('Live Price', 0))
-                
-            history_df['Exit Price Num'] = history_df.apply(get_final_exit_price, axis=1)
-
-            def calculate_closed_pnl(row):
-                e_val = safe_float(row.get('Entry Price', 0))
-                exit_p = safe_float(row.get('Exit Price Num', 0))
-                return ((exit_p - e_val) / e_val) * 100 if e_val > 0 and exit_p > 0 else 0.0
-
-            history_df['Trade P&L (%) Num'] = history_df.apply(calculate_closed_pnl, axis=1)
-            history_df['Entry Price Num'] = history_df['Entry Price'].apply(lambda x: safe_float(x))
-            history_df['Trade P&L (₹)'] = (history_df['Trade P&L (%) Num'] / 100) * INVESTMENT_PER_TRADE
-
-            total_cumulative_pnl_amount = history_df['Trade P&L (₹)'].sum()
-            total_cumulative_pnl_pct = (total_cumulative_pnl_amount / TOTAL_PORTFOLIO_CAPITAL) * 100
-
-            hist_color = "#10b981" if total_cumulative_pnl_amount > 0 else "#ef4444" if total_cumulative_pnl_amount < 0 else "inherit"
-            hist_sign = "+" if total_cumulative_pnl_amount > 0 else ""
-            
-            st.markdown(f"""
-            <div style="margin-bottom: 15px;">
-                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L (Realized on ₹10L Capital)</div>
-                <div style="display: flex; align-items: baseline; gap: 8px;">
-                    <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}₹{total_cumulative_pnl_amount:,.0f}</div>
-                    <div style="font-size: 1rem; font-weight: 700; color: {hist_color};">({hist_sign}{total_cumulative_pnl_pct:.2f}%)</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-            st.divider()
-
-            history_df['Trade P&L (%)'] = history_df['Trade P&L (%) Num']
-            if 'Entry Price' in history_df.columns: history_df = history_df.drop('Entry Price', axis=1)
-            history_df = history_df.rename(columns={'Entry Price Num': 'Entry Price'})
-            if 'Exit Price' in history_df.columns: history_df = history_df.drop('Exit Price', axis=1)
-            history_df = history_df.rename(columns={'Exit Price Num': 'Exit Price'})
-
-            columns_to_keep = [col for col in ['Stock Symbol', 'Company Name', 'Entry Date', 'Hit Date', 'Entry Price', 'Exit Price', 'Trade P&L (₹)', 'Trade P&L (%)', 'Status'] if col in history_df.columns]
-            
-            def color_status(val):
-                val_str = str(val).strip().upper()
-                if val_str == 'TARGET HIT': return 'color: #00FF00; font-weight: bold;' 
-                elif val_str == 'SL HIT': return 'color: #FF0000; font-weight: bold;' 
-                elif val_str == 'TRAIL EXIT': return 'color: #8b5cf6; font-weight: bold;' 
-                elif val_str == 'REPLACED': return 'color: #64748b; font-weight: bold;' 
-                return ''
-
-            def color_pnl(val):
-                if '+' in str(val) or (isinstance(val, (int, float)) and val > 0): return 'color: #00FF00;' 
-                elif '-' in str(val) or (isinstance(val, (int, float)) and val < 0): return 'color: #FF0000;' 
-                return ''
-
-            format_dict = {
-                "Entry Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
-                "Hit Date": lambda t: t.strftime('%d/%m/%Y') if not pd.isna(t) else "--",
-                "Entry Price": "{:.2f}", "Exit Price": "{:.2f}",  
-                "Trade P&L (₹)": lambda x: f"₹{safe_float(x):+,.0f}",
-                "Trade P&L (%)": lambda x: f"{safe_float(x):+.2f}%" 
-            }
-
-            st.dataframe(history_df[columns_to_keep].style.map(color_status, subset=['Status']).map(color_pnl, subset=['Trade P&L (₹)', 'Trade P&L (%)']).format(format_dict), use_container_width=True, hide_index=True)
-        else: st.info("No closed trades found in history yet.")
-            
-time.sleep(5)
-st.rerun()
+        st.info("History tracking active.")
