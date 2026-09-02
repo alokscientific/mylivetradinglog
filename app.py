@@ -5,6 +5,7 @@ import urllib.parse
 import xml.etree.ElementTree as ET
 import yfinance as yf
 import time
+import json
 
 # --- CONSTANT INVESTMENT SETTINGS ---
 INVESTMENT_PER_TRADE = 100000
@@ -70,20 +71,27 @@ def safe_float(val, default=0.0):
     try: return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
     except: return default
 
-# FIX 3: Upgraded Yahoo Finance logic for "Today's Change"
+# Yeh function direct Yahoo Server se Today's Change layega bina kisi library cache ke
 @st.cache_data(ttl=60)
 def get_yahoo_change(symbol):
     try:
+        import json
         yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
         if "BSE:" in symbol: yf_sym = symbol.replace("BSE:", "") + ".BO"
-        tkr = yf.Ticker(yf_sym)
-        # Fetching last 5 days to ensure we get a solid Previous Close calculation
-        hist = tkr.history(period="5d")
-        if len(hist) >= 2:
-            prev = hist['Close'].iloc[-2]
-            curr = hist['Close'].iloc[-1]
-            if prev > 0: return f"{((curr - prev) / prev) * 100:+.2f}%"
-    except: pass
+        
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{yf_sym}?interval=1d&range=2d"
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        response = urllib.request.urlopen(req, timeout=3)
+        data = json.loads(response.read())
+        
+        meta = data['chart']['result'][0]['meta']
+        prev_close = meta['chartPreviousClose']
+        curr_price = meta['regularMarketPrice']
+        
+        if prev_close and prev_close > 0:
+            return f"{((curr_price - prev_close) / prev_close) * 100:+.2f}%"
+    except Exception as e:
+        pass
     return None
 
 @st.cache_data(ttl=1800)
