@@ -2,10 +2,10 @@ import streamlit as st
 import pandas as pd
 import urllib.request
 import urllib.parse
-import xml.etree.ElementTree as ET
-import yfinance as yf
-import time
 import json
+import xml.etree.ElementTree as ET
+import time
+import random
 
 # --- CONSTANT INVESTMENT SETTINGS ---
 INVESTMENT_PER_TRADE = 100000
@@ -45,7 +45,6 @@ html, body, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFo
 .text-red { color: #ef4444 !important; }
 .text-purple { color: #8b5cf6 !important; }
 
-/* FIX 2: CSS Animation for News Ticker */
 .news-section { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%); border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; overflow: hidden; }
 .news-icon { font-size: 1rem; margin-right: 8px; z-index: 2; background: inherit; }
 .news-marquee-container { width: 100%; overflow: hidden; white-space: nowrap; position: relative; }
@@ -71,27 +70,22 @@ def safe_float(val, default=0.0):
     try: return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
     except: return default
 
-# 🚀 UPGRADED YAHOO FETCHER (Anti-Block & Multi-Agent)
-@st.cache_data(ttl=30) # Cache time reduced to 30 seconds
-def get_yahoo_change(symbol):
-    import json
-    import urllib.request
-    import random
+# 🚀 CACHE BUSTER FUNCTION: Naya naam, Nayi shuruaat (Bypasses old cache completely)
+@st.cache_data(ttl=30)
+def get_daily_change_fresh(symbol):
     try:
         yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
         if "BSE:" in symbol: yf_sym = symbol.replace("BSE:", "") + ".BO"
         
-        # Rotating User-Agents to prevent Yahoo from blocking
         user_agents = [
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2.1 Safari/605.1.15'
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
         ]
         
-        # Using query2 endpoint which is more reliable
         url = f"https://query2.finance.yahoo.com/v8/finance/chart/{yf_sym}?interval=1d&range=2d"
         req = urllib.request.Request(url, headers={'User-Agent': random.choice(user_agents), 'Accept': 'application/json'})
-        
-        response = urllib.request.urlopen(req, timeout=4)
+        response = urllib.request.urlopen(req, timeout=3)
         data = json.loads(response.read())
         
         meta = data['chart']['result'][0]['meta']
@@ -100,7 +94,7 @@ def get_yahoo_change(symbol):
         
         if prev_close and curr_price and prev_close > 0:
             return f"{((curr_price - prev_close) / prev_close) * 100:+.2f}%"
-    except Exception as e:
+    except Exception:
         pass
     return None
 
@@ -173,10 +167,11 @@ def draw_card(row):
             price_title = "Live Price"
             pnl_title = "LIVE P&L (₹1L)"
             
-            yf_change = get_yahoo_change(raw_symbol)
+            # 🚀 NAYA CACHE BUSTER FUNCTION CALL YAHAN HAI
+            yf_change = get_daily_change_fresh(raw_symbol)
+            
             if yf_change: change_str = yf_change
             else:
-                # Safe fallback if column name differs
                 t_change_raw = str(row.get("Today's Change", row.get("Today's Chg", "0"))).strip()
                 val = safe_float(t_change_raw)
                 change_str = f"{val * 100:+.2f}%" if '%' not in t_change_raw and abs(val) < 1.0 and val != 0 else f"{val:+.2f}%"
@@ -225,7 +220,6 @@ def draw_card(row):
             """, unsafe_allow_html=True)
             
             latest_news = get_live_news(company_name)
-            # FIX 2: Replaced <marquee> with safe CSS animation
             st.markdown(f"""
             <div class="news-section">
                 <span class="news-icon">📰</span> 
