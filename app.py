@@ -3,7 +3,6 @@ import pandas as pd
 import urllib.request
 import urllib.parse
 import xml.etree.ElementTree as ET
-import yfinance as yf
 import time
 import concurrent.futures
 
@@ -78,18 +77,6 @@ def safe_float(val, default=0.0):
     try: return float(val_str.replace('%', '').replace(',', '').replace('+', ''))
     except: return default
 
-@st.cache_data(ttl=60)
-def get_yahoo_change(symbol):
-    try:
-        yf_sym = symbol.replace("NSE:", "").replace("BSE:", "") + ".NS"
-        if "BSE:" in symbol: yf_sym = symbol.replace("BSE:", "") + ".BO"
-        tkr = yf.Ticker(yf_sym)
-        prev = tkr.fast_info['previous_close']
-        curr = tkr.fast_info['last_price']
-        if prev and prev > 0: return f"{((curr - prev) / prev) * 100:+.2f}%"
-    except: pass
-    return None
-
 @st.cache_data(ttl=1800)
 def get_live_news(company_name):
     try:
@@ -120,13 +107,12 @@ def load_data():
 
 df = load_data()
 
-# 🚀 PRE-FETCH ENGINE (1-SECOND LOAD FIX)
+# 🚀 PRE-FETCH ENGINE FOR NEWS ONLY (ULTRA FAST LOAD)
 if not df.empty:
     active_df = df[df['Status_Clean'].isin(["IN TRADE"])]
     if not active_df.empty:
         with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
             for _, row in active_df.iterrows():
-                executor.submit(get_yahoo_change, str(row['Stock Symbol']).strip())
                 executor.submit(get_live_news, str(row.get('Company Name', '--')))
 
 def draw_card(row):
@@ -160,10 +146,12 @@ def draw_card(row):
             display_price = safe_float(row.get('Live Price', 0))
             price_title, pnl_title = "Live Price", "LIVE P&L (₹1L)"
             
-            yf_change = get_yahoo_change(raw_symbol)
-            if yf_change: change_str = yf_change
-            else:
-                val = safe_float(str(row.get("Today's Change", "0")).strip())
+            # 🚀 DIRECT SHEET DATA FETCH (NO YAHOO)
+            t_change_raw = str(row.get("Today's Change", row.get("Today's Chg", "0"))).strip()
+            val = safe_float(t_change_raw)
+            if '%' not in t_change_raw and abs(val) < 1.0 and val != 0: 
+                change_str = f"{val * 100:+.2f}%"
+            else: 
                 change_str = f"{val:+.2f}%"
             
             change_color = "#10b981" if "+" in change_str else "#ef4444" if "-" in change_str else "inherit"
