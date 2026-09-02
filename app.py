@@ -44,15 +44,22 @@ html, body, p, span, div { font-family: 'Inter', -apple-system, BlinkMacSystemFo
 .news-section { background: linear-gradient(90deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.02) 100%); border-left: 3px solid #3b82f6; padding: 6px 8px; border-radius: 4px; margin-bottom: 10px; display: flex; align-items: center; }
 .news-icon { font-size: 1rem; margin-right: 8px; }
 .news-marquee { color: #60a5fa; font-weight: 600; font-size: 0.75rem; }
+.stButton button { padding: 8px 10px !important; font-weight: 700; border-radius: 6px; background-color: rgba(59, 130, 246, 0.1); border: 1px solid #3b82f6; }
 </style>
 """, unsafe_allow_html=True)
 
-st.markdown("""
-<div class="header-container">
-    <div class="main-title">TRADE LOG SYSTEM</div>
-    <div class="sub-title">Track & Trade Terminal</div>
-</div>
-""", unsafe_allow_html=True)
+col_head, col_btn = st.columns([0.85, 0.15])
+with col_head:
+    st.markdown("""
+    <div class="header-container">
+        <div class="main-title">TRADE LOG SYSTEM</div>
+        <div class="sub-title">Track & Trade Terminal</div>
+    </div>
+    """, unsafe_allow_html=True)
+with col_btn:
+    if st.button("🔄 Refresh Data", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
 
 st.markdown("""
 <div style="background-color: rgba(245, 158, 11, 0.1); border-left: 4px solid #f59e0b; padding: 6px 12px; border-radius: 4px; margin-bottom: 20px; display: flex; align-items: center; border: 1px solid rgba(245, 158, 11, 0.2);">
@@ -73,16 +80,16 @@ def safe_float(val, default=0.0):
 @st.cache_data(ttl=1800)
 def get_live_news(company_name):
     try:
-        clean_name = company_name.split()[0]
+        clean_name = str(company_name).split()[0].replace("&", "")
         query = urllib.parse.quote(f"{clean_name} stock news India")
         url = f"https://news.google.com/rss/search?q={query}&hl=en-IN&gl=IN&ceid=IN:en"
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response = urllib.request.urlopen(req, timeout=3)
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'})
+        response = urllib.request.urlopen(req, timeout=4)
         root = ET.fromstring(response.read())
-        headlines = [item.find('title').text for item in root.findall('.//item')[:2]]
+        headlines = [item.find('title').text for item in root.findall('.//item')[:3]]
         if headlines: return " &nbsp; ✦ &nbsp; ".join(headlines)
     except: pass
-    return f"Tracking updates for {company_name}..."
+    return f"Fetching latest updates for {clean_name}..."
 
 SHEET_ID = "1rsrmQMe8hbjGfsAx7039oMPdmqwWC5hHCpEFQSlVH9o"
 MAIN_GID = "1424037063"
@@ -100,7 +107,7 @@ def load_data():
 
 df = load_data()
 
-# Pre-fetch News
+# 🚀 PRE-FETCH ENGINE FOR NEWS
 if not df.empty:
     active_df = df[df['Status_Clean'].isin(["IN TRADE"])]
     if not active_df.empty:
@@ -139,7 +146,12 @@ def draw_card(row):
             display_price = safe_float(row.get('Live Price', 0))
             price_title, pnl_title = "Live Price", "LIVE P&L (₹1L)"
             
-            t_change_raw = str(row.get("Today's Change", row.get("Today's Chg", "0"))).strip()
+            # 🚀 ROBUST SHEET DATA FETCH (Grabs exact Column F / Index 5 safely)
+            try:
+                t_change_raw = str(row.iloc[5]).strip()
+            except:
+                t_change_raw = "0"
+                
             val = safe_float(t_change_raw)
             if '%' not in t_change_raw and abs(val) < 1.0 and val != 0: 
                 change_str = f"{val * 100:+.2f}%"
@@ -166,6 +178,7 @@ def draw_card(row):
         </div>
         """, unsafe_allow_html=True)
 
+        # 🚀 NEWS TICKER IS INSIDE THIS EXPANDER
         with st.expander("View Trade Details"):
             st.markdown(f"""
             <div style="font-size: 0.8rem; opacity: 0.9; font-weight: 600; margin-bottom: 2px;">{company_name}</div>
@@ -333,6 +346,6 @@ if not df.empty:
         else:
             st.info("No closed trades found in history yet.")
 
-# Auto-refresh loop background execution
-time.sleep(10)
+# Restored stable 60-second background auto-refresh
+time.sleep(60)
 st.rerun()
