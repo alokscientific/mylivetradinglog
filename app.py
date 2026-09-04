@@ -283,7 +283,7 @@ if not df.empty:
             
             st.markdown(f"""
             <div style="margin-bottom: 15px;">
-                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L (₹10L Capital w.e.f. 14-July-2026)</div>
+                <div style="font-size: 0.8rem; font-weight: 600; opacity: 0.7; margin-bottom: 4px;">Closed Trade Cumulative P&L (₹10L Capital w.e.f. 10-July-2026)</div>
                 <div style="display: flex; align-items: baseline; gap: 8px;">
                     <div style="font-size: 1.6rem; font-weight: 900; color: {hist_color};">{hist_sign}₹{total_cumulative_pnl_amount:,.0f}</div>
                     <div style="font-size: 1rem; font-weight: 700; color: {hist_color};">({hist_sign}{total_cumulative_pnl_pct:.2f}%)</div>
